@@ -1,0 +1,580 @@
+% BR&Panda_to_FT.m
+%
+% imports neural (LFP) data from Blackrock NS6 data (decimated to 1000 Hz)
+%
+% imports data from parsed python files (.par)
+% these files contain eye, position and velocity data all using the same
+% timescale, but with samples of different data types falling at different
+% timespoints; the timescale is resampled at 1 kHz to match sampling rate 
+% of neural recordings, and additional data points between samples are 
+% filled in using interpolation.
+%
+% the data is integrated into Fieldtrip format for further analysis
+%
+% 141017 Mike Jutras (with parts adapted from quickLineup by Yoni Browning)
+%
+%
+% this code requires ft_nearest.m, inpaint_nans.m, ft_progress.m
+% before running, must run Python script MakeParFiles in the directory containing 
+% the Python log files
+% (e.g. R:\Buffalo Lab\VR Task Data UW\Giuseppe\panda data\JN_14_08_25_13_12)
+
+% Notes:
+% revised in part from analyzeNav140418
+% python samples position/direction at ~83 Hz; eye data @240
+%
+% timestamp values in panda log are already in ms (1 kHz)
+
+% CHANGE LOG:
+% 3/18/15 - MJJ - the data structure generated at the end now provides the
+% correct info (and only the correct info, i.e. nothing extra from trldat)
+% that Fieldtrip needs. "data.trial" includes eye and position data along
+% with the neural data; these "analog" data are pulled from the Python log
+% and interpolated to 1 kHz sampling. "data.time" is designated in units of
+% seconds, with the first time sample, 0, corresponding with the first
+% sample designated in data.sampleinfo.
+% Also, uses neural data from NS6 file instead of NS2 file. NS2 data are
+% delayed relative to NS6 data due to the filtering that we usually use.
+
+% TO DO:
+% - integrate NEV data, including trial event timestamps ("encodes")
+
+%% specify filenames (need to do this manually for now)
+
+% specify the directory containing log files
+BRnam = 'JN150413001'; 
+sessionDir = 'JN_BR_15_04_14\JN_BR_15_04_14_13_34';
+
+
+logDir = 'R:\Buffalo Lab\VR Task Data UW\Giuseppe\panda data\';
+% BRDir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data';
+savDir = 'R:\Buffalo Lab\Virtual Navigation\MATLAB\MAT files\trial data';
+% decDir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\NS6 - decimated';
+
+% copy files to local drive if network transfer rate is slow
+% BRDir = 'C:\Data\VR';
+% savDir = 'C:\Data\VR';
+% decDir = 'C:\Data\VR';
+
+%% import panda log file info
+
+[logtime_eye, id_eye, x_eye, y_eye] = textread(fullfile(logDir,sessionDir,'eyepos.par'), '%f%s%f%f'); % eye data
+[logtime_ava, id_ava, x_ava, y_ava] = textread(fullfile(logDir,sessionDir,'avatar.par'), '%f%s%f%f'); % avatar (position) data
+
+% eye data: timestamps, x and y coordinates in viewing field
+time_eye = logtime_eye(strcmp(id_eye,'eye'));
+xeye_real = x_eye(strcmp(id_eye,'eye'));
+yeye_real = y_eye(strcmp(id_eye,'eye'));
+
+% position data: timestamps, x and y coordinates in virtual environment
+time_pos = logtime_ava(strcmp(id_ava,'pos'));
+xpos_real = x_ava(strcmp(id_ava,'pos'));
+ypos_real = y_ava(strcmp(id_ava,'pos'));
+
+% direction data: timestamps and direction
+time_dir = logtime_ava(strcmp(id_ava,'dir'));
+dir_real = x_ava(strcmp(id_ava,'dir'));
+
+% velocity data
+time_vel = logtime_ava(strcmp(id_ava,'speed'));
+vel_real = x_ava(strcmp(id_ava,'speed'));
+
+% start and duration of each trial (when bananas appear)
+% the last instance of '100' will mark the end of the last trial
+log_trl_starttime = unique(logtime_eye(strcmp(id_eye,'100')));
+log_trl_length = diff(log_trl_starttime);
+
+
+%% get all the data into one structure
+
+trlinf = [];
+trltimarr = [];
+ft_progress('init', 'etf',     'Please wait...');
+for trllop = 1:length(log_trl_starttime)-1
+    
+    ft_progress(trllop/(length(log_trl_starttime)-1), 'Processing event %d from %d', trllop, (length(log_trl_starttime)-1));
+    
+    % trial time according to panda log file
+    trltim = [log_trl_starttime(trllop) log_trl_starttime(trllop+1)-1];
+    
+%     % buffer the start and end times for each trial 100 samples on each side
+%     trlstart_eye = ft_nearest(time_eye,trltim(1)-100);
+%     trlend_eye = ft_nearest(time_eye,trltim(2)+100);
+%     
+%     trlstart_pos = ft_nearest(time_pos,trltim(1)-100);
+%     trlend_pos = ft_nearest(time_pos,trltim(2)+100);
+%     
+%     trlstart_dir = ft_nearest(time_dir,trltim(1)-100);
+%     trlend_dir = ft_nearest(time_dir,trltim(2)+100);
+%     
+%     trlstart_vel = ft_nearest(time_vel,trltim(1)-100);
+%     trlend_vel = ft_nearest(time_vel,trltim(2)+100);
+
+    % eye data
+    if ~isempty(find(time_eye<trltim(1),1,'last'))
+        trlstart_eye = find(time_eye<trltim(1),1,'last');
+    else
+        trlstart_eye = ft_nearest(time_eye,trltim(1));
+    end
+    if ~isempty(find(time_eye>trltim(2),1,'first'))
+        trlend_eye = find(time_eye>trltim(2),1,'first');
+    else
+        trlend_eye = ft_nearest(time_eye,trltim(2));
+    end
+
+    % position data
+    if ~isempty(find(time_pos<trltim(1),1,'last'))
+        trlstart_pos = find(time_pos<trltim(1),1,'last');
+    else
+        trlstart_pos = ft_nearest(time_pos,trltim(1));
+    end
+    if ~isempty(find(time_pos>trltim(2),1,'first'))
+        trlend_pos = find(time_pos>trltim(2),1,'first');
+    else
+        trlend_pos = ft_nearest(time_pos,trltim(2));
+    end
+
+    % direction data
+    if ~isempty(find(time_dir<trltim(1),1,'last'))
+        trlstart_dir = find(time_dir<trltim(1),1,'last');
+    else
+        trlstart_dir = ft_nearest(time_dir,trltim(1));
+    end
+    if ~isempty(find(time_dir>trltim(2),1,'first'))
+        trlend_dir = find(time_dir>trltim(2),1,'first');
+    else
+        trlend_dir = ft_nearest(time_dir,trltim(2));
+    end
+
+    % velocity data
+    if ~isempty(find(time_vel<trltim(1),1,'last'))
+        trlstart_vel = find(time_vel<trltim(1),1,'last');
+    else
+        trlstart_vel = ft_nearest(time_vel,trltim(1));
+    end
+    if ~isempty(find(time_vel>trltim(2),1,'first'))
+        trlend_vel = find(time_vel>trltim(2),1,'first');
+    else
+        trlend_vel = ft_nearest(time_vel,trltim(2));
+    end
+    
+    trltimarr(trllop,:,:) = [trltim; ...
+        time_eye(trlstart_eye) time_eye(trlend_eye); ...
+        time_pos(trlstart_pos) time_pos(trlend_pos); ...
+        time_dir(trlstart_dir) time_dir(trlend_dir); ...
+        time_vel(trlstart_vel) time_vel(trlend_vel)];
+    
+    trlinf{trllop}.eyetime = time_eye(trlstart_eye:trlend_eye);
+    trlinf{trllop}.postime = time_pos(trlstart_pos:trlend_pos);
+    trlinf{trllop}.dirtime = time_dir(trlstart_dir:trlend_dir);
+    trlinf{trllop}.veltime = time_vel(trlstart_vel:trlend_vel);
+    trlinf{trllop}.eyedat = [xeye_real(trlstart_eye:trlend_eye)'; yeye_real(trlstart_eye:trlend_eye)'];
+    trlinf{trllop}.posdat = [xpos_real(trlstart_pos:trlend_pos)'; ypos_real(trlstart_pos:trlend_pos)'];
+    trlinf{trllop}.dirdat = dir_real(trlstart_dir:trlend_dir)';
+    trlinf{trllop}.veldat = vel_real(trlstart_vel:trlend_vel)';
+    trlinf{trllop}.trltim = trltim;
+   
+end
+ft_progress('close')
+
+clear logtime_* id_eye x_eye y_eye id_ava x_ava y_ava
+clear time_* xeye_real yeye_real xpos_real ypos_real dir_real vel_real
+
+
+%% resample to 1000 Hz and interpolate data points between samples
+
+% the data structure created here is easily merged with the Fieldtrip
+% (neural data analysis toolbox) data structure
+
+clear dat*
+
+dattime = cell(1,length(trlinf));
+dateyedat = cell(1,length(trlinf));
+datposdat = cell(1,length(trlinf));
+datdirdat = cell(1,length(trlinf));
+datveldat = cell(1,length(trlinf));
+
+t0 = clock;
+
+parfor trllop = 1:length(trlinf)
+        
+    % interpolate eye data
+    eyetime_interp = trlinf{trllop}.eyetime(1):trlinf{trllop}.eyetime(end);
+    eye_interp = nan(2,length(eyetime_interp));
+    for k=1:length(eyetime_interp)
+        if ismember(eyetime_interp(k),trlinf{trllop}.eyetime)
+            eye_interp(:,k) = trlinf{trllop}.eyedat(:,find(trlinf{trllop}.eyetime==eyetime_interp(k),1,'last'));
+        end
+    end
+    eye_interp=inpaint_nans(eye_interp,2);
+
+    % interpolate position data
+    postime_interp = trlinf{trllop}.postime(1):trlinf{trllop}.postime(end);
+    pos_interp = nan(2,length(postime_interp));
+    for k=1:length(postime_interp)
+        if ismember(postime_interp(k),trlinf{trllop}.postime)
+            pos_interp(:,k) = trlinf{trllop}.posdat(:,find(trlinf{trllop}.postime==postime_interp(k),1,'last'));
+        end
+    end
+    pos_interp=inpaint_nans(pos_interp,2);
+
+    % interpolate direction data
+    dirtime_interp = trlinf{trllop}.dirtime(1):trlinf{trllop}.dirtime(end);
+    dir_interp = nan(1,length(dirtime_interp));
+    for k=1:length(dirtime_interp)
+        if ismember(dirtime_interp(k),trlinf{trllop}.dirtime)
+            dir_interp(1,k) = trlinf{trllop}.dirdat(1,find(trlinf{trllop}.dirtime==dirtime_interp(k),1,'last'));
+        end
+    end
+    dir_interp=inpaint_nans(dir_interp,2);
+
+    % interpolate velocity data
+    veltime_interp = trlinf{trllop}.veltime(1):trlinf{trllop}.veltime(end);
+    vel_interp = nan(1,length(veltime_interp));
+    for k=1:length(veltime_interp)
+        if ismember(veltime_interp(k),trlinf{trllop}.veltime)
+            vel_interp(1,k) = trlinf{trllop}.veldat(1,find(trlinf{trllop}.veltime==veltime_interp(k),1,'last'));
+        end
+    end
+    vel_interp=inpaint_nans(vel_interp,2);
+
+    
+    dateyedat{trllop} = eye_interp(:,find(eyetime_interp==trlinf{trllop}.trltim(1)):find(eyetime_interp==trlinf{trllop}.trltim(2)));
+    datposdat{trllop} = pos_interp(:,find(postime_interp==trlinf{trllop}.trltim(1)):find(postime_interp==trlinf{trllop}.trltim(2)));
+    datdirdat{trllop} = dir_interp(find(dirtime_interp==trlinf{trllop}.trltim(1)):find(dirtime_interp==trlinf{trllop}.trltim(2)));
+    datveldat{trllop} = vel_interp(find(veltime_interp==trlinf{trllop}.trltim(1)):find(veltime_interp==trlinf{trllop}.trltim(2)));
+    
+    % additional step converts direction data to angle in radians
+    datdirdat{trllop} = mod(datdirdat{trllop} + 90, 360) * pi/180;
+
+    dattime{trllop} = trlinf{trllop}.trltim(1):trlinf{trllop}.trltim(2);
+    
+end
+
+fprintf('%g\n',etime(clock,t0));
+
+clear data
+data.time = dattime;
+data.eyedat = dateyedat;
+data.posdat = datposdat;
+data.dirdat = datdirdat;
+data.veldat = datveldat;
+
+clear dattime dateyedat datposdat datdirdat datveldat
+
+% % plot example trial(s) to double-check alignment
+% trllop=2;
+% figure;hold on;
+% plot(data.time{trllop},data.posdat{trllop}');
+% plot(data.time{trllop},data.dirdat{trllop}');
+% plot(data.time{trllop},data.veldat{trllop}');
+% plot(data.time{trllop},data.eyedat{trllop}')
+
+
+%% add fruit info
+
+[logtime_frt, id_frt, ~, x_frt, y_frt] = textread(fullfile(logDir,sessionDir,'fruit.par'), '%f%s%f%f%f'); % avatar (position) data
+
+data.frtpos = cell(1);
+data.frttim = cell(1);
+for trllop = 1:length(data.time)
+    
+    % logind: index of which data to use for the trial
+    logind = logtime_frt>=data.time{trllop}(1) & logtime_frt<=data.time{trllop}(end);
+    
+    % fruit positions for each trial
+    xdum = x_frt(logical(logind.*strcmp(id_frt,'pos')));
+    ydum = y_frt(logical(logind.*strcmp(id_frt,'pos')));
+    data.frtpos{trllop} = [xdum(xdum~=0 | ydum~=0) ydum(xdum~=0 | ydum~=0)];
+    
+    % timestamps for getting fruit for each trial
+    data.frttim{trllop} = logtime_frt(logical(logind.*strcmp(id_frt,'eaten')));
+    
+end
+
+
+%% save the behavioral data file
+% (if stopping here, otherwise proceed to create trial data file)
+
+trldat = data;
+
+[~,sesnam]=fileparts(sessionDir);
+
+save(fullfile(savDir,[sesnam '_trldat.mat']),'trldat')
+
+
+%% SKIP TO HERE: load the behavioral data file
+
+[~,sesnam]=fileparts(sessionDir);
+
+load(fullfile(savDir,[sesnam '_trldat.mat']))
+
+
+% trldat now contains all of the relevant information from the python log
+
+
+%% create array marking first "eat/reward" event in each trial
+
+inieatarr = [];
+timarr = [];
+for trllop = 1:length(trldat.time)
+    timarr = [timarr trldat.time{trllop}];
+    dum = zeros(size(trldat.time{trllop}));
+    dum(trldat.time{trllop}==trldat.eattim{trllop}(1)) = 1;
+    inieatarr = [inieatarr dum];
+end
+
+
+%% load the raw data (NS6, decimated version); align the NEV (timestamp) and NS (continuous) signals
+
+% open NEV file
+NEV = openNEV(fullfile(BRDir,[BRnam '.nev']),'read'); % NEV file; contains event codes and timestamps
+
+% open decimated NS6 file
+load(fullfile(decDir,[BRnam '_NS6_SF30.mat'])) % decimated NS6 file; 1000 Hz
+
+% open NS2 file
+NS2 = openNSx(fullfile(BRDir,[BRnam '.NS2']),'read','precision','double'); % NS2 file (contains eye & position data)
+
+NEVfs = 1/double(NEV.MetaTags.SampleRes); % sampling frequency of NEV file (should be 1/30000)
+NS2fs = 1/NS2.MetaTags.SamplingFreq; % sampling frequency of NS2 file (should be 0.001)
+DECfs = 0.001; % sampling frequency of decimated NS6 file
+NS6fs = 1/NS6.MetaTags.SamplingFreq; % sampling frequency of NS6 file (should also be 1/30000)
+
+% find first non-zero value in NS6 file
+nonzer = find(NS6.Data(1,:)~=0,1,'first');
+
+% % this should be true
+% length(nonzer:30:size(NS6b.Data,2))+(nonzer-1)==size(NS6.Data,2)
+
+% basically the first nonzero value is the same for NS6b and decimated NS6
+% I think this is a bug
+
+% create time arrays for each file; timestamps match data samples
+% NEV timestamps will be the same as those in NS6
+NS6ts = NS6fs:NS6fs:(NEV.MetaTags.DataDuration*NS6fs);
+DECts = [nan(1,nonzer-1) NS6ts(nonzer):DECfs:(size(NS2.Data,2)-nonzer)*NS2fs+NS6ts(nonzer)];
+NS2ts = NS2fs:NS2fs:(size(NS2.Data,2)*NS2fs);
+
+% create label arrays for NS2 and NS6 channels
+NS2lab = cell(1,length(NS2.ElectrodesInfo));
+for lablop = 1:length(NS2.ElectrodesInfo)
+    NS2lab{lablop} = NS2.ElectrodesInfo(lablop).Label;
+end
+NS6lab = cell(1,length(NS6.ElectrodesInfo));
+for lablop = 1:length(NS6.ElectrodesInfo)
+    NS6lab{lablop} = NS6.ElectrodesInfo(lablop).Label;
+end
+
+
+%% create trials based on the NEV file
+
+% for JN150209001, fix weird event where 1000 appears twice instead of 1001
+if strcmp(BRnam,'JN150209001')
+    NEV.Data.SerialDigitalIO.UnparsedData(2202)=1001;
+end
+
+c=1;
+m=1000; % trial onset codes start at 1000 and progress incrementally
+clear NEVper
+NEVper.val={};
+NEVper.tim={};
+for vallop = 1:length(NEV.Data.SerialDigitalIO.UnparsedData)
+% for vallop = 2142:length(NEV.Data.SerialDigitalIO.UnparsedData) % for JN150209001
+    if NEV.Data.SerialDigitalIO.UnparsedData(vallop)==m
+        
+        m=m+1;
+        for k=1:find(ismember(NEV.Data.SerialDigitalIO.UnparsedData(vallop+1:end),[1000 m]),1,'first')
+            
+            % build NEVper.val, each cell contains one trial, each row is an event
+            NEVper.val{c}(k,1) = NEV.Data.SerialDigitalIO.UnparsedData(vallop+k-1);
+            
+            % NEVevtTSind: NEV timestamp corresponding with the event code
+            NEVevtTSind = NEV.Data.SerialDigitalIO.TimeStamp(vallop+k-1);
+            
+            % actual timestamp is given in "NS6 clock time"
+            NEVper.tim{c}(k,1) = NS6ts(NEVevtTSind);
+            
+        end
+        
+        if NEV.Data.SerialDigitalIO.UnparsedData(find(ismember(NEV.Data.SerialDigitalIO.UnparsedData(vallop+1:end),[1000 m]),1,'first') + vallop)==1000
+            m=1000;
+        end
+        
+        c=c+1;
+        
+        vallop = find(ismember(NEV.Data.SerialDigitalIO.UnparsedData(vallop+1:end),[1000 m]),1,'first') + vallop;
+        
+    end
+end
+
+
+%% get first "eat" event from each trial in NEV file
+
+inieatarrNEV = zeros(size(DECts));
+for trllop = 1:length(NEVper.val)
+    
+    if ~isempty(find(NEVper.val{trllop}==200,1,'first'))
+
+        [~,inieatnevind] = min(abs(DECts-NEVper.tim{trllop}(find(NEVper.val{trllop}==200,1,'first'))));
+        inieatarrNEV(inieatnevind) = 1;
+        
+    end
+    
+end
+
+[Xs, lag] = xcorr(inieatarr, inieatarrNEV);
+[~,Is] = max(Xs);
+lag(Is)
+
+% calculate lag between each Python event and NEV event, after accounting
+% for total lag
+tl1 = (1/1000:1/1000:length(inieatarr)/1000);
+tl2 = (1/1000:1/1000:length(inieatarrNEV)/1000)+(lag(Is)/1000);
+ts1 = tl1(logical(inieatarr));
+ts2 = tl2(logical(inieatarrNEV));
+lagarr = nan(length(ts1),2);
+for trllop = 1:length(ts1)
+    [~,dum] = min(abs(ts2-ts1(trllop)));
+    lagarr(trllop,:) = [ts1(trllop) ts2(dum)];
+end
+
+%% line up behavioral data with raw LFPs (adapted from quickLineup)
+
+% find eye & position signals in NS2
+eyeindx = find(strncmpi(NS2lab,'ainp1',5));
+eyeindy = find(strncmpi(NS2lab,'ainp2',5));
+posindx = find(strncmpi(NS2lab,'ainp3',5));
+posindy = find(strncmpi(NS2lab,'ainp4',5));
+
+eyedatNS2 = NS2.Data([eyeindx eyeindy],:);
+posdatNS2 = NS2.Data([posindx posindy],:);
+
+clear trial sampleinfo eyedatBR posdatBR
+ft_progress('init', 'etf',     'Please wait...');
+for trllop = 1:length(trldat.eyedat)
+    ft_progress(trllop/length(trldat.eyedat), 'Processing event %d from %d', trllop, length(trldat.eyedat));
+    
+    [Xs, lag] = xcorr(eyedatNS2(1,:), trldat.eyedat{trllop}(1,:));
+    [~,Is] = max(Xs);
+    trl_start = lag(Is);
+    trl_end = trl_start+length(trldat.eyedat{trllop})-1;
+    
+    trl_start_tim = NS2ts(trl_start);
+    trl_end_tim = NS2ts(trl_end);
+    [~,trl_start_ind] = min(abs(DECts-trl_start_tim));
+    [~,trl_end_ind] = min(abs(DECts-trl_end_tim));
+    
+    % Save as a new file structure containing all the necessary info.
+    trial{trllop} = double(NS6.Data(:,trl_start_ind:trl_end_ind));
+    
+    % append the eye & position data from the Python log file
+    trial{trllop}(end+1:end+2,:) = trldat.eyedat{trllop};
+    trial{trllop}(end+1:end+2,:) = trldat.posdat{trllop};
+    
+    % append the eye and position data from Blackrock file
+    trial{trllop}(end+1:end+2,:) = eyedatNS2(:,trl_start:trl_end);
+    trial{trllop}(end+1:end+2,:) = posdatNS2(:,trl_start:trl_end);
+    
+    % include both Blackrock and Python analog data for now, until we
+    % decide which version has cleaner A2D conversion
+
+    % corresponds to samples in decimated NS6 file
+    sampleinfo(trllop,:) = [trl_start_ind trl_end_ind];
+    
+end
+ft_progress('close')
+
+% create the data structure for Fieldtrip
+clear data
+data.trial = trial;
+data.sampleinfo = sampleinfo;
+for trllop = 1:size(sampleinfo,1)
+    data.time{trllop} = 0:0.001:(diff(sampleinfo(trllop,:),1,2)/1000);
+end
+data.fsample = 1000;
+data.label = {'A01'; 'A02'; 'A03'; 'A04'; 'A05'; 'A06'; 'A07'; ...
+    'A08'; 'A09'; 'A10'; 'A11'; 'A12'; 'B01'; 'B02'; 'B03'; 'B04'; ...
+    'B05'; 'B06'; 'B07'; 'B08'; 'B09'; 'B10'; 'B11'; 'B12'; 'C01'; ...
+    'C02'; 'C03'; 'C04'; 'C05'; 'C06'; 'C07'; 'C08'; 'C09'; 'C10'; ...
+    'C11'; 'C12'; 'eyeX_P'; 'eyeY_P'; 'posX_P'; 'posY_P'; 'eyeX_B'; ...
+    'eyeY_B'; 'posX_B'; 'posY_B'};
+clear trial sampleinfo eyedatNS2 posdatNS2
+
+
+%% save the complete data file
+
+save(fullfile(savDir,[BRnam '_NSdat.mat']),'data')
+
+
+%% plot eye and position data trial by trial to ensure accuracy
+
+close all
+xpi = find(strcmp(data.label,'eyeX_P'));
+xbi = find(strcmp(data.label,'eyeX_B'));
+ppi = find(strcmp(data.label,'posX_P'));
+pbi = find(strcmp(data.label,'posY_B')); % BR position data is rotated relative to Panda
+for trllop = 1:length(data.trial)
+
+    xp = data.trial{trllop}(xpi,:);
+    xb = data.trial{trllop}(xbi,:);
+    
+    xpn = xp/(max(xp)-min(xp));
+    xbn = xb/(max(xb)-min(xb));
+    
+    pp = data.trial{trllop}(ppi,:);
+    pb = data.trial{trllop}(pbi,:);
+    
+    ppn = pp/(max(pp)-min(pp));
+    pbn = pb/(max(pb)-min(pb));
+    
+    figure
+    subplot(2,1,1);plot([xpn; xbn]')
+    subplot(2,1,2);plot([ppn; pbn]')
+    pause;close
+    
+end
+
+
+%% compare timestamps when banana is eaten between NEV and Python logs
+
+bandifmat = [];
+for trllop = 1:length(data.trial)
+    
+    [~,NEVbnd1] = min(abs(NS6ts-DECts(data.sampleinfo(trllop,1))));
+    [~,NEVbnd2] = min(abs(NS6ts-DECts(data.sampleinfo(trllop,2))));
+
+    NEVtrlind = find(NEV.Data.SerialDigitalIO.TimeStamp>=NEVbnd1 & ...
+        NEV.Data.SerialDigitalIO.TimeStamp<=NEVbnd2);
+    
+    % hopefully there are only 10 occurences of bananas being eaten!
+    banind = find(NEV.Data.SerialDigitalIO.UnparsedData(NEVtrlind)==200);
+    if length(banind)==10
+        
+        banTS = NEV.Data.SerialDigitalIO.TimeStamp(NEVtrlind(banind));
+        bantim = NS6ts(banTS);
+        bandif = (bantim - DECts(data.sampleinfo(trllop,1)))*1000; % convert to ms
+        
+        bandifmat = [bandifmat; bandif' trldat.eattim{trllop}-trldat.time{trllop}(1)];
+        
+    end
+    
+end
+
+median(diff(bandifmat,1,2)) % 66.4
+
+figure;subplot(2,1,1);hold on
+scatter(1:size(bandifmat,1),diff(bandifmat,1,2))
+bandiftrlmat = [];
+for k=1:length(data.trial)
+    line([k*10+0.5 k*10+0.5],ylim,'Color','r')
+    bandiftrlmat(:,k) = diff(bandifmat((k*10-9):k*10,:),1,2);
+end
+subplot(2,1,2)
+scatter(1:10,mean(bandiftrlmat,2))
+
+
+%% plot eye data offset per trial
+
+figure
+plot(diff([log_trl_starttime(1:end-1) sampleinfo(:,1)],1,2)-diff([log_trl_starttime(1) sampleinfo(1,1)],1,2))
