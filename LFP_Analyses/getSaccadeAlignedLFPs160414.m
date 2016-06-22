@@ -7,8 +7,8 @@
 % BRnam = 'JN160414001';
 % BRnam = 'JN160414002';
 % BRnam = 'JN160414003';
-% BRnam = 'JN160418003';
-BRnam = 'JN160421003';
+BRnam = 'JN160418003';
+% BRnam = 'JN160421003';
 
 
 %%
@@ -148,8 +148,8 @@ fixint = diff(sacarr(:,1));
 fixThresh = 300;
 
 % sacdat = nan(96,size(sacarr,1),501); % all fixation periods
-% sacdat = nan(96,length(find(fixint>fixThresh)),701); % OPTION 1: only >fixThresh (ms) fixation periods, -200:500 (nans when fixation period ends before 500ms)
-sacdat = nan(96,length(find(fixint>fixThresh)),2001); % OPTION 2: only >fixThresh (ms) fixation periods, -1000:1000 (keep saccade info in trialinfo, otherwise data are padded with continuous signal on either side for TF analysis)
+sacdat = nan(96,length(find(fixint>fixThresh)),701); % OPTION 1: only >fixThresh (ms) fixation periods, -200:500 (nans when fixation period ends before 500ms)
+% sacdat = nan(96,length(find(fixint>fixThresh)),2001); % OPTION 2: only >fixThresh (ms) fixation periods, -1000:1000 (keep saccade info in trialinfo, otherwise data are padded with continuous signal on either side for TF analysis)
 
 c=1;
 
@@ -158,13 +158,13 @@ trialinfo = [];
 
 for saclop=1:size(sacarr,1)-1
     
-%     if sacarr(saclop+1,1)-sacarr(saclop,1)>fixThresh && sacarr(saclop,1)>fixThresh % OPTION 1
-    if sacarr(saclop+1,1)-sacarr(saclop,1)>fixThresh && sacarr(saclop,1)>1000 && sacarr(saclop)+1000<size(NS2.Data,2) % OPTION 2
+    if sacarr(saclop+1,1)-sacarr(saclop,1)>fixThresh && sacarr(saclop,1)>fixThresh % OPTION 1
+%     if sacarr(saclop+1,1)-sacarr(saclop,1)>fixThresh && sacarr(saclop,1)>1000 && sacarr(saclop)+1000<size(NS2.Data,2) % OPTION 2
 
         trialinfo(c,:) = [sacarr(saclop,1) sacarr(saclop+1,1)];
         
-%         timsel = sacarr(saclop,1)-200:min([sacarr(saclop,1)+500 sacarr(saclop+1,1)-1]); % OPTION 1
-        timsel = sacarr(saclop,1)-1000:sacarr(saclop,1)+1000; % OPTION 2
+        timsel = sacarr(saclop,1)-200:min([sacarr(saclop,1)+500 sacarr(saclop+1,1)-1]); % OPTION 1
+%         timsel = sacarr(saclop,1)-1000:sacarr(saclop,1)+1000; % OPTION 2
 
         sacdat(:,c,1:length(timsel)) = double(NS2.Data(1:96,timsel))-repmat(nanmean(NS2.Data(1:96,timsel),2),1,length(timsel));
         sampleinfo(c,:) = [timsel(1) timsel(end)];
@@ -262,9 +262,9 @@ labels = {'AD01','AD02','AD03','AD04','AD05','AD06','AD07','AD08','AD09','AD10',
 
 data= [];
 c=1;
-for trllop = 1:size(sacdatF,2)
-    if isempty(find(isnan(squeeze(sacdatF(1,trllop,1:451))), 1))
-        data.trial{c} = squeeze(sacdatF(good,trllop,1:451));
+for trllop = 1:size(sacdatG,2)
+    if isempty(find(isnan(squeeze(sacdatG(1,trllop,1:451))), 1))
+        data.trial{c} = squeeze(sacdatG(good,trllop,1:451));
         data.time{c} = -0.200:0.001:0.25;
         c=c+1;
     end
@@ -468,3 +468,4 @@ for k=1:length(LFPdatatemp.trial)
 end
 figure;imagesc(-0.2:0.001:0.25,LFPdatatemp.zs,squeeze(nanmean(h,1))); axis xy
 set(gca,'YTick',el_pos)
+hold on;line([0 0],ylim,'Color','k')
