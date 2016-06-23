@@ -8,7 +8,7 @@ function trldat = PARtoTRLDAT(sessionDir,runpar)
 % filled in using interpolation.
 %
 % also imports data related to target (fruit) placement and acquisition
-% during each trial, including alpha (transparency) levels
+% during each trial, including alpha (transparency) levels for recall task
 %
 % use the trldat structure to align the neural data using BRtoFT
 %
@@ -34,7 +34,8 @@ function trldat = PARtoTRLDAT(sessionDir,runpar)
 % point to the specific subfolder; now just specify the entire address for
 % the session directory
 % (i.e. 'R:\Buffalo Lab\VR Task Data UW\MrPeepers\panda data\MP_15_10_01_12_42')
-%
+% 160623 - MJJ - removed requirement for ft_progress; added ability to
+% handle foraging data files
 
 if nargin==1
     runpar = 0; % if set to 1, run interpolation using parallel processing
@@ -68,6 +69,17 @@ vel_real = x_ava(strcmp(id_ava,'speed'));
 % start of each trial
 log_trl_starttime = logtime_eye(strcmp(id_eye,'NewTrial'));
 
+% at least early on, log files for foraging task did not contain NewTrial
+% these use a different version of MakeParFiles.py, specifically for the
+% foraging task, which creates a banana.par file instead of fruit.par
+if isempty(log_trl_starttime)
+    disp('Loading banana PAR file')
+    [logtime_ban, id_ban, ~, x_ban, y_ban] = textread(fullfile(sessionDir,'banana.par'), '%f%s%f%f%f'); % banana (position) data
+    log_trl_starttime = unique(logtime_ban(strncmp('pos',id_ban,3)));
+    isforage = 1;
+else
+    isforage = 0;
+end
 
 % get all the data into one structure
 disp('Grouping data into trials')
@@ -76,10 +88,10 @@ ft_defaults
 
 trlinf = [];
 trltimarr = [];
-ft_progress('init', 'etf',     'Please wait...');
 for trllop = 1:length(log_trl_starttime)-1 % don't include the last trial, usually gets cut off
     
-    ft_progress(trllop/(length(log_trl_starttime)-1), 'Processing trial %d from %d', trllop, (length(log_trl_starttime)-1));
+    fprintf('Processing trial %d of %d', trllop, (length(log_trl_starttime)-1));
+    fprintf('\n')
     
     % trial time according to panda log file
     trltim = [log_trl_starttime(trllop) log_trl_starttime(trllop+1)-1];
@@ -149,9 +161,8 @@ for trllop = 1:length(log_trl_starttime)-1 % don't include the last trial, usual
     trlinf{trllop}.trltim = trltim;
    
 end
-ft_progress('close')
 
-clear logtime_* id_eye x_eye y_eye id_ava x_ava y_ava
+clear logtime_eye logtime_ava id_eye x_eye y_eye id_ava x_ava y_ava
 clear time_* xeye_real yeye_real xpos_real ypos_real dir_real vel_real
 
 
@@ -219,10 +230,10 @@ if runpar==1
         
 else
     
-    ft_progress('init', 'etf',     'Please wait...');
     for trllop = 1:length(trlinf)
-        
-        ft_progress(trllop/length(trlinf), 'Processing trial %d from %d', trllop, length(trlinf));
+
+        fprintf('Processing trial %d of %d', trllop, length(trlinf))
+        fprintf('\n')
         
         % interpolate eye data
         eyetime_interp = trlinf{trllop}.eyetime(1):trlinf{trllop}.eyetime(end);
@@ -267,7 +278,6 @@ else
         dattime{trllop} = trlinf{trllop}.trltim(1):trlinf{trllop}.trltim(2);
         
     end
-    ft_progress('close')
     
 end
 
@@ -290,43 +300,85 @@ clear dattime dateyedat datposdat datdirdat datveldat
 % plot(trldat.time{trllop},trldat.eyedat{trllop}')
 
 
-% add fruit info
-disp('Loading fruit PAR file')
+if isforage==0
+    
+    % add fruit info
+    disp('Loading fruit PAR file')
 
-% % appearance of new bananas: '100'
-% log_trl_starttime = unique(logtime_eye(strcmp(id_eye,'100')));
+    % % appearance of new bananas: '100'
+    % log_trl_starttime = unique(logtime_eye(strcmp(id_eye,'100')));
 
-[logtime_frt, id_frt, alph, x_frt, y_frt] = textread(fullfile(sessionDir,'fruit.par'), '%f%s%f%f%f'); % avatar (position) data
+    [logtime_frt, id_frt, alph, x_frt, y_frt] = textread(fullfile(sessionDir,'fruit.par'), '%f%s%f%f%f'); % avatar (position) data
 
-trldat.frtpos = cell(1);
-trldat.frttim = cell(1);
-trldat.alpha = cell(1);
-trldat.newfrt = cell(1);
-for trllop = 1:length(trldat.time)
+    trldat.frtpos = cell(1);
+    trldat.frttim = cell(1);
+    trldat.alpha = cell(1);
+    trldat.newfrt = cell(1);
+    for trllop = 1:length(trldat.time)
+
+        % logind: index of which data to use for the trial
+        logind = logtime_frt>=trldat.time{trllop}(1) & logtime_frt<=trldat.time{trllop}(end);
+
+        % fruit positions for each trial
+        % include timestamps and 'alph' (0 for banana, 1 for cherry)
+        frtposdum = [logtime_frt(logical(logind.*strcmp(id_frt,'pos'))) alph(logical(logind.*strcmp(id_frt,'pos'))) x_frt(logical(logind.*strcmp(id_frt,'pos'))) y_frt(logical(logind.*strcmp(id_frt,'pos')))];
+        % some positions are all zeros (happens at beginning of session)
+        trldat.frtpos{trllop} = frtposdum(frtposdum(:,3)~=0 | frtposdum(:,4)~=0,:);
+
+        % timestamps for getting fruit for each trial
+        trldat.frttim{trllop} = [logtime_frt(logical(logind.*strcmp(id_frt,'eaten'))) alph(logical(logind.*strcmp(id_frt,'eaten')))];
+
+        % alpha levels with timestamps, for each trial
+        trldat.alpha{trllop} = [logtime_frt(logical(logind.*strcmp(id_frt,'alpha'))) alph(logical(logind.*strcmp(id_frt,'alpha')))];
+        % if no alpha specified at trial start, alpha is set to 0
+        if isempty(find(logtime_frt==trldat.time{trllop}(1).*strcmp(id_frt,'alpha'),1))
+            trldat.alpha{trllop} =  [trldat.time{trllop}(1) 0; trldat.alpha{trllop}];
+        end
+
+        trldat.newfrt{trllop} = logtime_frt(logical(logind.*strcmp(id_frt,'100')));
+
+    end
+
+else
     
-    % logind: index of which data to use for the trial
-    logind = logtime_frt>=trldat.time{trllop}(1) & logtime_frt<=trldat.time{trllop}(end);
-    
-    % fruit positions for each trial
-    % include timestamps and 'alph' (0 for banana, 1 for cherry)
-    frtposdum = [logtime_frt(logical(logind.*strcmp(id_frt,'pos'))) alph(logical(logind.*strcmp(id_frt,'pos'))) x_frt(logical(logind.*strcmp(id_frt,'pos'))) y_frt(logical(logind.*strcmp(id_frt,'pos')))];
-    % some positions are all zeros (happens at beginning of session)
-    trldat.frtpos{trllop} = frtposdum(frtposdum(:,3)~=0 | frtposdum(:,4)~=0,:);
-    
-    % timestamps for getting fruit for each trial
-    trldat.frttim{trllop} = [logtime_frt(logical(logind.*strcmp(id_frt,'eaten'))) alph(logical(logind.*strcmp(id_frt,'eaten')))];
-    
-    % alpha levels with timestamps, for each trial
-    trldat.alpha{trllop} = [logtime_frt(logical(logind.*strcmp(id_frt,'alpha'))) alph(logical(logind.*strcmp(id_frt,'alpha')))];
-    % if no alpha specified at trial start, alpha is set to 0
-    if isempty(find(logtime_frt==trldat.time{trllop}(1).*strcmp(id_frt,'alpha'),1))
-        trldat.alpha{trllop} =  [trldat.time{trllop}(1) 0; trldat.alpha{trllop}];
+    % add banana info
+    trldat.banpos = cell(1);
+    trldat.bantim = cell(1);
+%     [logtime_ban, id_ban, ~, x_ban, y_ban] = textread(fullfile(sessionDir,'banana.par'), '%f%s%f%f%f'); % banana (position) data
+    for trllop = 1:length(trldat.time)
+
+        % logind: index of which data to use for the trial
+        logind = logtime_ban>=trldat.time{trllop}(1) & logtime_ban<=trldat.time{trllop}(end);
+
+        % banana positions for each trial
+        % include timestamps (time of banana appearance, here should
+        % coincide with start of "trial")
+        banposdum = [logtime_ban(logical(logind.*strcmp(id_ban,'pos'))) x_ban(logical(logind.*strcmp(id_ban,'pos'))) y_ban(logical(logind.*strcmp(id_ban,'pos')))];
+        % some positions are all zeros (happens at beginning of session)
+        trldat.banpos{trllop} = banposdum(banposdum(:,2)~=0 | banposdum(:,3)~=0,:);
+
+        % timestamps for getting fruit for each trial
+        % include the number of the banana (indexed in banpos)
+        bantimdum = logtime_ban(logical(logind.*strcmp(id_ban,'eaten')));
+        % in the event that there are more elements in bantimdum than in
+        % banposdum, the extra element is due to the extra reward given at
+        % the end of the trial and can be discounted
+        bantimdum = bantimdum(1:length(banposdum));
+        whichban = nan(size(bantimdum));
+        for banlop = 1:length(bantimdum)
+            getpos = trldat.posdat{trllop}(:,trldat.time{trllop}==bantimdum(banlop));
+            posdst = nan(size(bantimdum));
+            for poslop = 1:size(banposdum,1)
+                posdst(poslop) = sqrt((banposdum(poslop,2)-getpos(1))^2 + (banposdum(poslop,3)-getpos(2))^2);
+            end
+            [~, whichban(banlop,1)] = min(posdst);
+        end
+        
+        trldat.bantim{trllop} = [bantimdum whichban];
+
     end
     
-    trldat.newfrt{trllop} = logtime_frt(logical(logind.*strcmp(id_frt,'100')));
-
 end
-
 
 % save the behavioral data file
 
