@@ -1,6 +1,12 @@
+% This code calculates pEpisode for a select few VR sessions and uses three
+% different cycle lengths, giving pEpisode measures for each cycle length
+% Also contains code to parse virtual movement based on forward momentum
+% and turning, marking "bouts" of each, and calculates pEpisode within
+% bouts of each behavioral condition 
+
 % datdir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\NS6 - decimated\';
-datdir = 'R:\Buffalo Lab\Mike\VirtualNav\MAT files\NS6 - decimated\';
-pepdir = 'R:\Buffalo Lab\Mike\VirtualNav\MAT files\pEpisode_mult_cycles\';
+datdir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\NS6decimated\';
+pepdir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\pEpisode\pEpisode_mult_cycles\';
 
 samplerate = 1000;
 freqs = (2^(1/8)).^(8:42);
@@ -101,7 +107,7 @@ sesnam = 'JN140825010';
 % sesnam = 'JN150209001';
 % sesnam = 'JN150410003';
 
-pepdir = 'R:\Buffalo Lab\Mike\VirtualNav\MAT files\pEpisode_mult_cycles\';
+pepdir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\pEpisode\pEpisode_mult_cycles\';
 load(fullfile(pepdir,[sesnam '_pEpisode.mat']))
 
 % average pepisode across session
@@ -258,8 +264,8 @@ for trllop = 1:length(trldat.angdif)
 
     angdifdif = [diff(trldat.angdif{trllop}) 0]; % create differential of filtered velocity signal
 
-    % differential change marker: finds "reversals", when eye velocity goes 
-    % from negative to positive (speeds up from slowing down)
+    % differential change marker: finds "reversals", when turning velocity
+    % goes from negative to positive (speeds up from slowing down)
     difchgmrk = zeros(size(angdifdif));
     for k = 2:length(angdifdif)-1
         if angdifdif(k) == 0
@@ -269,8 +275,8 @@ for trllop = 1:length(trldat.angdif)
         end
     end
 
-    %detect saccade begins and saccade ends, based on when velocity crosses
-    %threshold set above
+    % detect turn begins and turn ends, based on when ang. velocity crosses
+    % threshold set above
     trnbegdum = find(diff(trldat.angdif{trllop} > anglim) > 0)+1;
     trnenddum = find(diff(trldat.angdif{trllop} > anglim) < 0)+1;
     if trldat.angdif{trllop}(1) > anglim
@@ -294,8 +300,8 @@ for trllop = 1:length(trldat.angdif)
         difind1 = difind1(difind1>0 & difind1<=length(difchgmrk));
         difind2 = difind2(difind2>0 & difind2<=length(difchgmrk));
 
-        % make sure only includes velocity "reversals" that are not part of a
-        % saccade (so only at beginning/end of saccade)
+        % make sure only includes velocity "reversals" that are not part of
+        % a turn (so only at beginning/end of turn)
         ang_below_thresh_dum1 = ang_below_thresh(difind1);
         ang_below_thresh_dum2 = ang_below_thresh(difind2);
 
