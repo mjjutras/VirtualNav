@@ -1,6 +1,8 @@
 BRnam = 'JN140825011';
 
-datdir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\trial data\';
+% datdir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\trial data\';
+% datdir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat\';
+datdir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat\olderTRLDATfiles\';
 load(fullfile(datdir, [BRnam '_trldat.mat']))
 
 %% plot all the trials; pause between each figure
