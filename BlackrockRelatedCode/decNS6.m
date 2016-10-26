@@ -6,7 +6,12 @@ fildir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data\';
 
 NS6 = openNSx(fullfile(fildir,[BRnam '.ns6']),'read','channels',1:36,'skipfactor',SF);
 
-decdir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\NS6 - decimated';
+[~,hostname]= system('hostname');
+if strncmp(hostname,'RBU-MikeJ',9) && ~strncmp(hostname,'RBU-MikeJ2',10)
+    decdir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\NS6 - decimated';
+elseif strncmp(hostname,'RBU-MikeJ2',10)
+    decdir = 'C:\Data\MAT\NS6 - decimated';
+end
 
 try
     save(fullfile(decdir, [BRnam '_NS6_SF' num2str(SF) '.mat']),'NS6')
