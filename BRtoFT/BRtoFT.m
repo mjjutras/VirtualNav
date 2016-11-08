@@ -1,4 +1,4 @@
-function data = BRtoFT(sesDir,BRnam)
+function data = BRtoFT(sesDir,decDir,BRnam)
 
 % BRtoFT.m
 %
@@ -33,11 +33,13 @@ function data = BRtoFT(sesDir,BRnam)
 % 6/24/15 MJJ - changed directories
 % 1/13/16 MJJ - fixed bug when running xcorr where lagind2 could go beyond
 % end of eyedatNS2
+% 161026 MJJ - revised to require entering decdir, the directory containing
+% the downsampled NS6 structure
+% Also changed trlDir, network directory housing trldat files
 
 
 BRDir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data';
-trlDir = 'R:\Buffalo Lab\Mike\VirtualNav\MAT files\trldat';
-decDir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\MATLAB\MAT files\NS6 - decimated';
+trlDir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat';
 
 % load the behavioral data file; trldat contains info from python log
 [~,sesnam]=fileparts(sesDir);
