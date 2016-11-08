@@ -1,4 +1,4 @@
-load('C:\Users\michael.jutras\Documents\Virtual Navigation Study\JN140825\JN140825011_sacdat141013.mat')
+load('R:\Buffalo Lab\Virtual Navigation\JN140825\JN140825011_sacdat141013.mat')
 
 %%
 

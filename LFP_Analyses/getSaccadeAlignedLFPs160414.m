@@ -1,3 +1,7 @@
+% first implant
+BRnam = 'JN140812001';
+
+% second implant
 % BRnam = 'JN160405002';
 % BRnam = '160406001';
 % BRnam = '160406002';
@@ -7,12 +11,16 @@
 % BRnam = 'JN160414001';
 % BRnam = 'JN160414002';
 % BRnam = 'JN160414003';
-BRnam = 'JN160418003';
+% BRnam = 'JN160418003';
 % BRnam = 'JN160421003';
 
 
 %%
-datdir = 'R:\Buffalo Lab\Virtual Navigation\UnityVR\NeuralData\';
+if str2num(BRnam(3:4))==14
+    datdir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data';
+elseif str2num(BRnam(3:4))==16
+    datdir = 'R:\Buffalo Lab\Virtual Navigation\UnityVR\NeuralData\';
+end
 
 NS2 = openNSx(fullfile(datdir,[BRnam '.ns2']),'read');
 
