@@ -1,9 +1,13 @@
+ft_defaults
+
 % BRnam = 'JN140812001';
 % BRnam = 'JN140813002';
-BRnam = 'JN140814002';
+% BRnam = 'JN140814002';
+% BRnam = 'JN140815002';
 % BRnam = 'JN140818002';
 % BRnam = 'JN140911002';
 % BRnam = 'JN141013002';
+BRnam = 'JN141212003';
 
 %%
 % decimate the recording (downsample from 30 kS/s to 1 kS/s
@@ -15,7 +19,7 @@ if strncmp(hostname,'RBU-MikeJ',9) && ~strncmp(hostname,'RBU-MikeJ2',10)
 elseif strncmp(hostname,'RBU-MikeJ2',10)
     decDir = 'C:\Data\MAT\NS6 - decimated';
 end
-netDir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\NS6decimated';
+netDir = 'R:\Mike\VirtualNavigationProject\MATFiles\NS6decimated';
 
 if exist(fullfile(decDir,[BRnam '_NS6_SF30.mat']),'file')
     load(fullfile(decDir,[BRnam '_NS6_SF30.mat']))
@@ -28,11 +32,12 @@ end
 
 %%
 % xB = [544000:574000]; % JN140812001
-% xB = [303211:333211]; % JN140813001
-xB = [1:500000]; % JN140814001
+% xB = [303211:333211]; % JN140813002
+% xB = [1:500000]; % JN140815002
 % xB = [172949:202949]; % JN140818002
 % xB = [152350:182350]; % JN140911002
 % xB = [135207:165207]; % JN141013002
+xB = [1:size(NS6.Data,2)]; % JN141212003
 
 channelcolormap = [0.75 0 0;0 0 1;0 1 0;0.44 0.19 0.63;0 0.13 0.38;0.5 0.5 0.5;1 0.75 0;1 0 0;0.89 0.42 0.04;0.85 0.59 0.58;0.57 0.82 0.31;0 0.69 0.94;1 0 0.4;0 0.69 0.31;0 0.44 0.75];
 
@@ -54,7 +59,7 @@ for chnlop = 1:36
     plot(NS6.Data(chnlop,xB)+2000*yaxplc,'Color',channelcolormap(yaxplc,:))
     
 %     xlim([0 30000])
-%     ylim([-4500 25500])
+    ylim([-5000 3e4])
     
 end
 

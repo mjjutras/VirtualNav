@@ -1,17 +1,24 @@
-function NS6 = decNS6(BRnam,decDir,SF)
+function NS6 = decNS6(BRnam,decdir,SF)
 
 % 161026 - revised to require entering decdir, the directory to save the
 % resulting downsampled NS6 structure
 
-fildir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data\';
-% fildir = 'C:\Users\michael.jutras\Documents\Virtual Navigation Study\Data\';
-% fildir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data - Peepers\';
+% load from network by defauly
+ns6dir = 'R:\Virtual Navigation\Recording Data\Blackrock Data\';
+% load from local drive if available (faster but data must be copied from network first
+[~,hostname]= system('hostname');
+if strncmp(hostname,'RBU-MikeJ2',10)
+    locDir = 'C:\Data\Blackrock_VR';
+    if exist(fullfile(locDir,[BRnam '.ns6']),'file')
+        ns6dir = locDir;
+    end
+end
 
-NS6 = openNSx(fullfile(fildir,[BRnam '.ns6']),'read','channels',1:36,'skipfactor',SF);
+NS6 = openNSx(fullfile(ns6dir,[BRnam '.ns6']),'read','channels',1:36,'skipfactor',SF);
 
 try
-    save(fullfile(decDir, [BRnam '_NS6_SF' num2str(SF) '.mat']),'NS6')
+    save(fullfile(decdir, [BRnam '_NS6_SF' num2str(SF) '.mat']),'NS6')
 catch
-    save(fullfile(decDir, [BRnam '_NS6_SF' num2str(SF) '.mat']),'NS6','-v7.3')
+    save(fullfile(decdir, [BRnam '_NS6_SF' num2str(SF) '.mat']),'NS6','-v7.3')
 end
-disp(['Created ' fullfile(decDir, [BRnam '_NS6_SF' num2str(SF) '.mat'])])
+disp(['Created ' fullfile(decdir, [BRnam '_NS6_SF' num2str(SF) '.mat'])])

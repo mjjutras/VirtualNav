@@ -1,7 +1,3 @@
-% first implant
-BRnam = 'JN140812001';
-
-% second implant
 % BRnam = 'JN160405002';
 % BRnam = '160406001';
 % BRnam = '160406002';

@@ -1,5 +1,5 @@
 fildir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data\';
-BRnam = 'JN140825011';
+BRnam = 'JN140815001';
 
 %% Array A
 

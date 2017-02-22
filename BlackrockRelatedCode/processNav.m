@@ -21,10 +21,15 @@ else
     NS6 = decNS6(BRnam,decDir,SF);
 end
 
-cd('C:\Users\michael.jutras\Documents\MATLAB\VirtualNav\PARtoTRLDAT')
-trldat = PARtoTRLDAT(sesDir,1);
 sesNam = sesDir(find(sesDir=='\',1,'last')+1:end);
-movefile(fullfile(sesDir,[sesNam '_trldat.mat']),fullfile('R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat',[sesNam '_trldat.mat']))
+trldatFil = fullfile('R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat',[sesNam '_trldat.mat']);
+if exist(trldatFil,'file')
+    load(trldatFil)
+else
+    cd('C:\Users\michael.jutras\Documents\MATLAB\VirtualNav\PARtoTRLDAT')
+    trldat = PARtoTRLDAT(sesDir,1);
+    movefile(fullfile(sesDir,[sesNam '_trldat.mat']),trldatFil)
+end
 
 cd('C:\Users\michael.jutras\Documents\MATLAB\VirtualNav\BRtoFT')
 data = BRtoFT(sesDir,decDir,BRnam);
