@@ -1,6 +1,7 @@
 % fildir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data\';
 fildir = 'C:\Data\Blackrock_VR';
-BRnam = 'JN140815002';
+% BRnam = 'JN140815002';
+BRnam = 'JN140813002';
 
 %% Array A
 
@@ -10,10 +11,20 @@ BRnam = 'JN140815002';
 
 NS2 = openNSx(fullfile(fildir,[BRnam '.ns2']),'read');
 
+xchan = [];
+ychan = [];
+for k = 1:size(NS2.ElectrodesInfo,2)
+    if strncmp(NS2.ElectrodesInfo(k).Label,'ainp1',5)
+        xchan = k;
+    elseif strncmp(NS2.ElectrodesInfo(k).Label,'ainp2',5)
+        ychan = k;
+    end
+end
+
 %%
 
-e_x = double(NS2.Data(1,:));
-e_y = double(NS2.Data(2,:));
+e_x = double(NS2.Data(xchan,:));
+e_y = double(NS2.Data(ychan,:));
 
 % stdmat=[];
 % for k=1:length(e_x)-3
@@ -61,18 +72,19 @@ e_y_new = inpaint_nans(e_y_new,2);
 
 
 figure;hold on
-scatter(1:10000,e_x(1:10000),'.b')
-scatter(1:10000,e_x_new(1:10000),'ob')
-% scatter(1:10000,e_y(1:10000),'.r')
-% scatter(1:10000,e_y_new(1:10000),'or')
+scatter(1:100000,e_x(1:100000),'.b')
+scatter(1:100000,e_x_new(1:100000),'ob')
+% scatter(1:100000,e_y(1:100000),'.r')
+% scatter(1:100000,e_y_new(1:100000),'or')
 
 %%
 fltord = 40;
 lowpasfrq = 80;
-lim = 120000;
 artpadding = 0.01;
 Fs = NS2.MetaTags.SamplingFreq; % sampling rate in Hz
 
+% lim = 120000;
+lim = 120000;
 
 %low pass filter the eye position data_eye
 nyqfrq = Fs ./ 2;
@@ -101,12 +113,12 @@ velF = abs(complex(x_vF,y_vF));
 vel_new = abs(complex(x_v_new,y_v_new));
 velF_new = abs(complex(x_vF_new,y_vF_new));
 
-% figure;hold on
-% plot(vel(1:100000))
-% plot(velF(1:100000),'r')
-% plot(vel_new(1:100000),'m')
-% plot(velF_new(1:100000),'g')
-% line(xlim,[lim lim],'Color','r')
+figure;hold on
+plot(vel(1:100000))
+plot(velF(1:100000),'r')
+plot(vel_new(1:100000),'m')
+plot(velF_new(1:100000),'g')
+line(xlim,[lim lim],'Color','r')
 
 %detect saccade begins and saccade ends
 sacbeg = find(diff(velF_new > lim) > 0);
@@ -154,16 +166,27 @@ sacarr(:,1) = [artifact(1,1); sacdumcol1(iai,1)];
 sacarr(:,2) = [sacdumcol2(iai,1); artifact(end,2)];
 
 figure;hold on
-scatter(1:10000,e_x(1:10000),'.b')
-scatter(1:10000,e_x_new(1:10000),'ob')
-scatter(1:10000,e_y(1:10000),'.r')
-scatter(1:10000,e_y_new(1:10000),'or')
-for k=1:find(sacarr(:,2)>10000,1,'first')
+scatter(1:100000,e_x(1:100000),'.b')
+scatter(1:100000,e_x_new(1:100000),'ob')
+scatter(1:100000,e_y(1:100000),'.r')
+scatter(1:100000,e_y_new(1:100000),'or')
+for k=1:find(sacarr(:,2)>100000,1,'first')
     line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
     line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
 end
 
-clear vel* x_* y_* e_*
+% clear vel* x_* y_* e_*
+
+%% plot x and y eye data
+
+figure
+ax(1) = subplot(3,1,1);
+plot(e_x,'b')
+ax(2) = subplot(3,1,2);
+plot(e_y,'r')
+ax(3) = subplot(3,1,3);
+plot(vel,'g')
+linkaxes(ax,'x')
 
 %%
 
