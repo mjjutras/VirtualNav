@@ -3,7 +3,7 @@ fildir = 'C:\Data\Blackrock_VR';
 % BRnam = 'JN140815002';
 BRnam = 'JN140813002';
 
-%% Array A
+%% load the data and create double-precision versions of eye data
 
 % NS6 = openNSx(fullfile(fildir,'JN140821002.ns6'),'read','c:1','s:30');
 % starts with sample 1 and then skips every 30, so first sample should
@@ -24,138 +24,122 @@ end
 e_x = double(NS2.Data(xchan,:));
 e_y = double(NS2.Data(ychan,:));
 
-%%
 
-% % standard deviation of signal within sliding window
-% stdmat=[];
-% for k=1:length(e_x)-3
-%     stdmat=[stdmat std(e_x(k:k+3))];
-% end
-% figure
-% ax(1) = subplot(2,1,1);
-% scatter(1:100000,e_x(1:100000),'.')
-% ax(2) = subplot(2,1,2);
-% scatter(1:100000,stdmat(1:100000),'.')
-% linkaxes(ax,'x')
+%% investigate different filtering parameters
 
-% redraw the eyetracker data, to replace data points that repeat (due to
-% higher sampling rate in Blackrock compared to eyetracker) with
-% interpolated data points
-% *this may not be strictly necessary since the signal gets filtered for
-% saccade detection
-e_x_new = nan(size(e_x));
-e_y_new = nan(size(e_y));
-e_x_new(1) = e_x(1);
-e_y_new(1) = e_y(1);
-for k=2:length(e_x)
-    
-    % repeated data points seem to stay within 150 of the initial data point
-    % however, actual deviations in measurements can stay within 150, so
-    % this won't perform perfectly when the eye is relatively still
-    % but this shouldn't matter since what we care about is saccade
-    % detection
-    if abs(e_x(k)-e_x(k-1))>150
-        e_x_new(k)=e_x(k);
-    end
-    if k>=4 && isempty(find(~isnan(e_x_new(k-3:k)),1))
-        e_x_new(k)=e_x(k);
-    end
-    
-    if abs(e_y(k)-e_y(k-1))>150
-        e_y_new(k)=e_y(k);
-    end
-    if k>=4 && isempty(find(~isnan(e_y_new(k-3:k)),1))
-        e_y_new(k)=e_y(k);
-    end
+% compare two sets of filtering parameters
+fltord1 = 40;
+lowpasfrq1 = 40;
+fltord2 = 60;
+lowpasfrq2 = 18;
 
-end
+Fs = NS2.MetaTags.SamplingFreq; % sampling rate in Hz
+nyqfrq = Fs ./ 2;
 
-e_x_new(end) = e_x(end);
-e_y_new(end) = e_y(end);
+flt1 = fir2(fltord1,[0,lowpasfrq1./nyqfrq,lowpasfrq1./nyqfrq,1],[1,1,0,0]);
+flt2 = fir2(fltord2,[0,lowpasfrq2./nyqfrq,lowpasfrq2./nyqfrq,1],[1,1,0,0]);
 
-% fill in nan values with interpolation
-e_x_new = inpaint_nans(e_x_new,2);
-e_y_new = inpaint_nans(e_y_new,2);
+% low pass filter the eye position data_eye
+e_x_lowpassfilter1 = filtfilt(flt1,1, e_x); e_y_lowpassfilter1 = filtfilt(flt1,1, e_y);
+e_x_lowpassfilter2 = filtfilt(flt2,1, e_x); e_y_lowpassfilter2 = filtfilt(flt2,1, e_y);
 
+% differentiate and multiply with sampling rate to get velocity as deg/sec
+% this gives the eye velocity in the horizontal and vertical domains
+x_vF1 = diff(e_x_lowpassfilter1) .* Fs; y_vF1 = diff(e_y_lowpassfilter1) .* Fs;
+x_vF2 = diff(e_x_lowpassfilter2) .* Fs; y_vF2 = diff(e_y_lowpassfilter2) .* Fs;
 
-figure;hold on
-scatter(1:100000,e_x(1:100000),'.b')
-scatter(1:100000,e_x_new(1:100000),'ob')
-% scatter(1:100000,e_y(1:100000),'.r')
-% scatter(1:100000,e_y_new(1:100000),'or')
+% differentiate and multiply with sampling rate without filtering
+x_v = diff(e_x) .* Fs; y_v = diff(e_y) .* Fs;
+
+% combine x- and y-velocity to get eye velocity in degrees/second
+vel = abs(complex(x_v,y_v));
+velF1 = abs(complex(x_vF1,y_vF1));
+velF2 = abs(complex(x_vF2,y_vF2));
+
+lim1 = median(velF1/0.6745)*3;
+lim2 = median(velF2/0.6745)*3;
+
+figure
+ax(1)=subplot(2,1,1);
+plot(1:100000,[e_x(1:100000); e_y(1:100000)])
+ax(2)=subplot(2,1,2);
+plot(1:100000,[vel(1:100000); velF1(1:100000); velF2(1:100000)])
+hold on
+line(xlim,[lim1 lim1],'Color','r')
+line(xlim,[lim2 lim2],'Color','g')
+linkaxes(ax,'x')
+legend({'raw' 'filt1' 'filt2'})
+
 
 %% filter the eye signal and calculate velocity for the original data
-% also treat the "new" interpolated data
 
 fltord = 40;
-lowpasfrq = 80;
+lowpasfrq = 40;
+
 artpadding = 0.01;
 Fs = NS2.MetaTags.SamplingFreq; % sampling rate in Hz
-
-% lim = 120000;
-lim = 120000;
-
-%low pass filter the eye position data_eye
 nyqfrq = Fs ./ 2;
+
 flt = fir2(fltord,[0,lowpasfrq./nyqfrq,lowpasfrq./nyqfrq,1],[1,1,0,0]);
-e_x_lowpassfilter=filtfilt(flt,1, e_x);
-e_y_lowpassfilter=filtfilt(flt,1, e_y);
-e_x_lowpassfilter_new=filtfilt(flt,1, e_x_new);
-e_y_lowpassfilter_new=filtfilt(flt,1, e_y_new);
 
-%differentiate and multiply with sampling rate to get velocity as deg/sec
-x_vF = diff(e_x_lowpassfilter) .* Fs;
-y_vF = diff(e_y_lowpassfilter) .* Fs;
-x_vF_new = diff(e_x_lowpassfilter_new) .* Fs;
-y_vF_new = diff(e_y_lowpassfilter_new) .* Fs;
+% low pass filter the eye position data_eye
+e_xbuf = [e_x(100:-1:1) e_x e_x(end:-1:end-99)]; % add buffer for filtering
+e_ybuf = [e_y(100:-1:1) e_y e_y(end:-1:end-99)]; % add buffer for filtering
+xss = filtfilt(flt,1,e_xbuf);
+yss = filtfilt(flt,1,e_ybuf);
+xss = xss(101:end-100); % remove buffer for filtering
+yss = yss(101:end-100); % remove buffer for filtering
 
-% % differentiate and multiply with sampling rate without filtering
-% % this gives the eye velocity in the horizontal and vertical domains
+% differentiate and multiply with sampling rate to get velocity as deg/sec
+% this gives the eye velocity in the horizontal and vertical domains
+x_vF = diff(xss) .* Fs;
+y_vF = diff(yss) .* Fs;
+
+% differentiate and multiply with sampling rate without filtering
 x_v = diff(e_x) .* Fs;
 y_v = diff(e_y) .* Fs;
-x_v_new = diff(e_x_new) .* Fs;
-y_v_new = diff(e_y_new) .* Fs;
 
 % combine x- and y-velocity to get eye velocity in degrees/second
 vel = abs(complex(x_v,y_v));
 velF = abs(complex(x_vF,y_vF));
-vel_new = abs(complex(x_v_new,y_v_new));
-velF_new = abs(complex(x_vF_new,y_vF_new));
 
-figure;hold on
-plot(vel(1:100000))
-plot(velF(1:100000),'r')
-plot(vel_new(1:100000),'m')
-plot(velF_new(1:100000),'g')
-line(xlim,[lim lim],'Color','r')
+lim = median(velF/0.6745)*5;
 
 %detect saccade starts and saccade ends
-sacbeg = find(diff(velF_new > lim) > 0);
-sacend = find(diff(velF_new > lim) < 0);
-if velF_new(end)>lim
-    sacbeg = sacbeg(1:end-1); % changed this line from artifact_xysaccade120420.m
+sacbeg = find(diff(velF > lim) > 0);
+sacend = find(diff(velF > lim) < 0);
+if velF(end)>lim
+    sacbeg = sacbeg(1:end-1);
 end
-if velF_new(1)>lim
+if velF(1)>lim
     sacend = sacend(2:end);
 end
 
 if size(sacbeg,1)
-    sacbeg=sacbeg';
-    sacend=sacend';
+    sacbeg = sacbeg';
+    sacend = sacend';
 end
     
 % artifact = round([sacbeg(:) - artpadding*Fs sacend(:) + artpadding*Fs]);
 artifact = round([sacbeg(:) sacend(:)]);
 
-% figure;hold on
-% scatter(1:10000,e_x(1:10000),'.b')
-% scatter(1:10000,e_x_new(1:10000),'ob')
-% scatter(1:10000,e_y(1:10000),'.r')
-% scatter(1:10000,e_y_new(1:10000),'or')
-% for k=1:find(artifact(:,2)>10000,1,'first')
-%     line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
-%     line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
-% end
+figure
+ax(1) = subplot(2,1,1);
+hold on
+scatter(1:100000,e_x(1:100000),'.b')
+scatter(1:100000,e_y(1:100000),'.r')
+for k=1:find(artifact(:,2)>100000,1,'first')
+    line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
+    line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
+end
+ax(2) = subplot(2,1,2);
+hold on
+scatter(1:100000,velF(1:100000),'.')
+for k=1:find(artifact(:,2)>100000,1,'first')
+    line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
+    line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
+end
+linkaxes(ax,'x')
 
 % h=[];
 % for k=1:size(artifact,1)
@@ -166,9 +150,9 @@ artifact = round([sacbeg(:) sacend(:)]);
 % % find saccade start/end in task time
 % sacdum = [NS2_timestamp(artifact(:,1))' NS2_timestamp(artifact(:,2))'];
 
-% merge artifacts when inter-artifact interval is less than 10 ms
+% merge artifacts when inter-artifact interval is less than 20 ms
 sacarr = [];
-iai=(artifact(2:end,1)-artifact(1:end-1,2))>10;
+iai=(artifact(2:end,1)-artifact(1:end-1,2))>20;
 sacdumcol1 = artifact(2:end,1);
 sacdumcol2 = artifact(1:end-1,2);
 sacarr(:,1) = [artifact(1,1); sacdumcol1(iai,1)];
@@ -176,15 +160,14 @@ sacarr(:,2) = [sacdumcol2(iai,1); artifact(end,2)];
 
 figure;hold on
 scatter(1:100000,e_x(1:100000),'.b')
-scatter(1:100000,e_x_new(1:100000),'ob')
 scatter(1:100000,e_y(1:100000),'.r')
-scatter(1:100000,e_y_new(1:100000),'or')
 for k=1:find(sacarr(:,2)>100000,1,'first')
     line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
     line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
 end
 
 % clear vel* x_* y_* e_*
+
 
 %% plot x and y eye data
 
@@ -194,7 +177,29 @@ plot(e_x,'b')
 ax(2) = subplot(3,1,2);
 plot(e_y,'r')
 ax(3) = subplot(3,1,3);
-plot(vel,'g')
+% plot(vel,'g')
+plot(velF,'g')
+linkaxes(ax,'x')
+
+%% mark epochs where gaze hits the edges of the eyetracker range
+
+% define "borders"
+xthresh = [diff(minmax(e_x))*0.001+min(e_x) diff(minmax(e_x))*0.999+min(e_x)];
+ythresh = [diff(minmax(e_y))*0.001+min(e_y) diff(minmax(e_y))*0.999+min(e_y)];
+
+% mark 
+x_bound = xor(e_x<xthresh(1), e_x>xthresh(2));
+y_bound = xor(e_y<ythresh(1), e_y>ythresh(2));
+eyebound = xor(x_bound, y_bound);
+
+figure
+ax(1) = subplot(3,1,1);
+plot(e_x,'b')
+ax(2) = subplot(3,1,2);
+plot(e_y,'r')
+ax(3) = subplot(3,1,3);
+plot(eyebound,'g')
+ylim([-0.25 1.25])
 linkaxes(ax,'x')
 
 %%
