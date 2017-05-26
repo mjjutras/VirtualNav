@@ -103,7 +103,7 @@ y_v = diff(e_y) .* Fs;
 vel = abs(complex(x_v,y_v));
 velF = abs(complex(x_vF,y_vF));
 
-lim = median(velF/0.6745)*5;
+lim = median(velF/0.6745)*5; % threshold taken from Quiroga (http://www.scholarpedia.org/article/Spike_sorting)
 
 %detect saccade starts and saccade ends
 sacbeg = find(diff(velF > lim) > 0);
@@ -123,23 +123,23 @@ end
 % artifact = round([sacbeg(:) - artpadding*Fs sacend(:) + artpadding*Fs]);
 artifact = round([sacbeg(:) sacend(:)]);
 
-figure
-ax(1) = subplot(2,1,1);
-hold on
-scatter(1:100000,e_x(1:100000),'.b')
-scatter(1:100000,e_y(1:100000),'.r')
-for k=1:find(artifact(:,2)>100000,1,'first')
-    line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
-    line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
-end
-ax(2) = subplot(2,1,2);
-hold on
-scatter(1:100000,velF(1:100000),'.')
-for k=1:find(artifact(:,2)>100000,1,'first')
-    line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
-    line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
-end
-linkaxes(ax,'x')
+% figure
+% ax(1) = subplot(2,1,1);
+% hold on
+% scatter(1:100000,e_x(1:100000),'.b')
+% scatter(1:100000,e_y(1:100000),'.r')
+% for k=1:find(artifact(:,2)>100000,1,'first')
+%     line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
+%     line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
+% end
+% ax(2) = subplot(2,1,2);
+% hold on
+% scatter(1:100000,velF(1:100000),'.')
+% for k=1:find(artifact(:,2)>100000,1,'first')
+%     line([artifact(k,1) artifact(k,1)],ylim,'Color','g')
+%     line([artifact(k,2) artifact(k,2)],ylim,'Color','r')
+% end
+% linkaxes(ax,'x')
 
 % h=[];
 % for k=1:size(artifact,1)
@@ -158,13 +158,13 @@ sacdumcol2 = artifact(1:end-1,2);
 sacarr(:,1) = [artifact(1,1); sacdumcol1(iai,1)];
 sacarr(:,2) = [sacdumcol2(iai,1); artifact(end,2)];
 
-figure;hold on
-scatter(1:100000,e_x(1:100000),'.b')
-scatter(1:100000,e_y(1:100000),'.r')
-for k=1:find(sacarr(:,2)>100000,1,'first')
-    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
-    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
-end
+% figure;hold on
+% scatter(1:100000,e_x(1:100000),'.b')
+% scatter(1:100000,e_y(1:100000),'.r')
+% for k=1:find(sacarr(:,2)>100000,1,'first')
+%     line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+%     line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+% end
 
 % clear vel* x_* y_* e_*
 
@@ -188,9 +188,9 @@ xthresh = [diff(minmax(e_x))*0.001+min(e_x) diff(minmax(e_x))*0.999+min(e_x)];
 ythresh = [diff(minmax(e_y))*0.001+min(e_y) diff(minmax(e_y))*0.999+min(e_y)];
 
 % mark 
-x_bound = xor(e_x<xthresh(1), e_x>xthresh(2));
-y_bound = xor(e_y<ythresh(1), e_y>ythresh(2));
-eyebound = xor(x_bound, y_bound);
+x_bound = e_x<xthresh(1) | e_x>xthresh(2);
+y_bound = e_y<ythresh(1) | e_y>ythresh(2);
+eyebound = x_bound | y_bound;
 
 figure
 ax(1) = subplot(3,1,1);
@@ -202,116 +202,127 @@ plot(eyebound,'g')
 ylim([-0.25 1.25])
 linkaxes(ax,'x')
 
+figure
+ax(1) = subplot(3,1,1);hold on
+plot(1:100000,e_x(1:100000),'.b')
+for k=1:find(sacarr(:,2)>100000,1,'first')
+    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+end
+ax(2) = subplot(3,1,2);hold on
+plot(1:100000,e_y(1:100000),'.r')
+for k=1:find(sacarr(:,2)>100000,1,'first')
+    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+end
+ax(3) = subplot(3,1,3);hold on
+plot(1:100000,eyebound(1:100000),'k')
+ylim([-0.25 1.25])
+for k=1:find(sacarr(:,2)>100000,1,'first')
+    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+end
+linkaxes(ax,'x')
+
+%% choose saccades that don't precede fixations at edges(borders)
+
+sacsel = zeros(size(sacarr,1),1);
+for saclop = 1:size(sacarr,1)
+    if saclop~=size(sacarr,1)
+        if isempty(find(eyebound(sacarr(saclop,2)+1:sacarr(saclop+1,1)-1),1))
+            sacsel(saclop) = 1;
+        end
+    else
+        if isempty(find(eyebound(sacarr(saclop,2)+1:end),1))
+            sacsel(saclop) = 1;
+        end
+    end
+end
+
+sacsel = find(sacsel);
+
 %%
 
 decdir = 'C:\Data\MAT\NS6 - decimated\';
 
 % load the decimated ("skipfactor") NS6 file
-load(fullfile(decdir,'JN140815002_NS6_SF30.mat'))
+load(fullfile(decdir,[BRnam '_NS6_SF30.mat']))
 
-NEV = openNEV('noread',fullfile(fildir,[BRnam '.nev']));
-% for some reason, NS6h.MetaTags.DataPoints not an integer when you do it
-% this way:
-% NS6r = openNSx('noread',fullfile(fildir,[BRnam '.ns6'])); % r is for "raw"
-NS6r = openNSx(fullfile(fildir,[BRnam '.ns6']),'c:1'); % r is for "raw"
+% NS6 file has 102 leading zeros, remove these and the signal matches the
+% NS2 data without the phase delay caused by the filtering in NS2
 
-ns2DTR = NS2.MetaTags.DateTimeRaw;
-ns6DTR = NS6r.MetaTags.DateTimeRaw; % (NS6 same as NS2, but Timestamp indicates slightly delayed start time)
-nevDTR = NEV.MetaTags.DateTimeRaw;
+%% get NS2 and NS6 saccade-aligned data
+% note that this is hard-coded to take 36 channels of neural data
 
-% get date vectors from BR MetaTags
-% (bug in NS2 and NS6 files: the hour value is off (value #5), although it
-% is correct in the NEV file)
-ns2datevec = [ns2DTR([1 2 4]) nevDTR(5) ns2DTR(6) ns2DTR(7)+ns2DTR(8)/1000];
-ns6datevec = [ns6DTR([1 2 4]) nevDTR(5) ns6DTR(6) ns6DTR(7)+ns6DTR(8)/1000+NS6r.MetaTags.Timestamp/NS6r.MetaTags.SamplingFreq];
-nevdatevec = [nevDTR([1 2 4 5 6]) nevDTR(7)+nevDTR(8)/1000];
+sacdatNS2 = nan(length(sacsel),36,501);
+sacdatNS6 = nan(length(sacsel),36,501);
 
-fs2 = 1/NS2.MetaTags.SamplingFreq;
-fs6 = 1/NS6r.MetaTags.SamplingFreq;
-
-% get the timestamps to match for NS2 and NS6 with 30-sample skipfactor applied:
-% Blackrock code (openNSx) behaves oddly here.
-% size(NS6h.Data,2) == 30259938, number of samples in original 30 kS/s file
-% first nonzero value occurs at 103 in both files:
-% find(NS6r.Data(1,:)~=0,1,'first') == 103
-% find(NS6.Data(1,:)~=0,1,'first') == 103
-% number of nonzero samples in NS6r: 30259938-102 == 30259836
-% size(NS6.Data,2) == 1008764
-% number of nonzero samples in NS6: 1008764-102 == 1008662
-% size(1:30:30259836,2) == 1008662, meaning that the "skipfactor" file
-% starts at the first nonzero value in the original NS6 file, then takes
-% every SFth sample (SF = 30 in our case) until the end
-% to deal with this, we need to take the timestamps for the original NS6
-% file, then to get the timestamps for the "skipfactor" file, start at the
-% first nonzero sample (here, sample #103)
-
-NS2_timestamp = datenum(ns2datevec)*86400:fs2:datenum(ns2datevec)*86400+NS2.MetaTags.DataDurationSec-fs2;
-
-% I'm choosing to strip all the zero values off of the NS6.Data matrix
-% another approach would be to include the zero values in the estimation of
-% the NS6 timestamps, however this means that the first n timestamps (n =
-% number of zero values) would be at a different temporal resolution than
-% the rest of the timestamps, due to the way Blackrock does the skipfactor
-% transformation
-NS6_timestamp_dum = datenum(ns6datevec)*86400:fs6:datenum(ns6datevec)*86400+NS6r.MetaTags.DataDurationSec-fs6;
-% length(NS6_timestamp_dum) == size(NS6r.Data,2)
-NS6_timestamp = NS6_timestamp_dum(find(NS6r.Data(1,:)~=0,1,'first'):30:end);
-NS6.Data = NS6.Data(:,find(NS6r.Data(1,:)~=0,1,'first'):end);
-% length(NS6_timestamp) == size(NS6.Data,2)
-
-%% get NS6 saccade-aligned data
-
-% find saccade start/end in task time
-NS2sacarr = [NS2_timestamp(sacarr(:,1))' NS2_timestamp(sacarr(:,2))'];
-
-sacdat = nan(size(sacarr,1),36,501);
-
-c=1;
-
-t0 = clock;
-ft_progress('init', 'etf',     'Please wait...');
-for saclop=1:size(NS2sacarr,1)-1
+ft_defaults
+ft_progress('init', 'etf', 'Please wait...');
+for saclop = 1:length(sacsel)
     
-    ft_progress(saclop/(size(NS2sacarr,1)), 'Processing event %d from %d', saclop, size(NS2sacarr,1));
+    ft_progress(saclop/length(sacsel), 'Processing event %d from %d', saclop, length(sacsel));
 
-    if NS2sacarr(saclop,1)>NS6_timestamp(1)+0.2 && NS2sacarr(saclop,1)<NS6_timestamp(end)
-        ts1 = ft_nearest(NS6_timestamp,NS2sacarr(saclop,1)-0.2); % saccade onset minus 200 ms
-        ts2 = ft_nearest(NS6_timestamp,NS2sacarr(saclop+1,1)); % onset of next saccade (end of fixation period)
-        if length(ts1:ts2)<=501
-            % take whole period if start of pre-saccade interval to end of
-            % fixation period is less than 501 ms
-            sacdat(c,:,1:length(ts1:ts2)) = NS6.Data(:,ts1:ts2);
-        else
-            % otherwise, truncate period at 300 ms after saccade onset
-            ts2 = ft_nearest(NS6_timestamp,NS2sacarr(saclop,1)+0.3);
-            sacdat(c,:,:) = NS6.Data(:,ts1:ts2);
+    if sacsel(saclop)~=size(sacarr,1) % don't use the very last saccade of the recording
+        
+        ind1 = sacarr(sacsel(saclop),1)-200; % saccade onset minus 200 ms
+        ind2 = sacarr(sacsel(saclop)+1,1)-1; % onset of next saccade - 1 (end of fixation period)
+        
+        if ind1 > 0 && ind1+602 <= size(NS6.Data,2)
+            
+            if length(ind1:ind2) <= 501
+                % take whole period if start of pre-saccade interval to end of
+                % fixation period is less than 501 ms
+                datbufNS2 = [double(NS2.Data(1:36,ind1:ind2)) nan(36,501-length(ind1:ind2))];
+                datbufNS6 = [double(NS6.Data(1:36,(ind1:ind2)+102)) nan(36,501-length(ind1:ind2))];
+            else
+                % otherwise, truncate period at 300 ms after saccade onset
+                datbufNS2 = double(NS2.Data(1:36,ind1:ind1+500));
+                datbufNS6 = double(NS6.Data(1:36,(ind1:ind1+500)+102));
+            end
         end
-        c=c+1;
+    
+        sacdatNS2(saclop,:,:) = datbufNS2;
+        sacdatNS6(saclop,:,:) = datbufNS6;
+        
     end
     
 end
 ft_progress('close')
-fprintf('total analysis time: %g\n',etime(clock,t0));
 
 % remove unused trial holders
-sacdat = sacdat(~isnan(squeeze(sacdat(:,1,1))),:,:);
+sacdatNS2 = sacdatNS2(~isnan(squeeze(sacdatNS2(:,1,1))),:,:);
+sacdatNS6 = sacdatNS6(~isnan(squeeze(sacdatNS6(:,1,1))),:,:);
 
-trlcnt = nan(1,size(sacdat,3));
-for timlop=1:size(squeeze(sacdat(1,:,:)),2)
-    trlcnt(timlop) = length(find(~isnan(squeeze(sacdat(:,1,timlop)))));
+trlcnt = nan(1,size(sacdatNS2,3));
+for timlop=1:size(squeeze(sacdatNS2(1,:,:)),2)
+    trlcnt(timlop) = length(find(~isnan(squeeze(sacdatNS2(:,1,timlop)))));
 end
 
 % save(fullfile('C:\Data\MAT\sacdat\',[BRnam '_sacdat.mat']),'sacdat','NS2_timestamp','NS6_timestamp','artifact','NS2sacarr','trlcnt')
 
 
 %% de-mean each LFP segment
-for k=1:size(sacdat,1)
-    for l=1:size(sacdat,2)
-        sacdat(k,l,:) = sacdat(k,l,:)-nanmean(sacdat(k,l,:));
+
+for k=1:size(sacdatNS2,1)
+    for l=1:size(sacdatNS2,2)
+        sacdatNS2(k,l,:) = sacdatNS2(k,l,:)-nanmean(sacdatNS2(k,l,:));
+        sacdatNS6(k,l,:) = sacdatNS6(k,l,:)-nanmean(sacdatNS6(k,l,:));
     end
 end
 
-%% plot some saccade-aligned LFPs
+%% plot average/SEM saccade-aligned LFPs, one example channel
+
+chnsel = 13;
+
+figure; hold on
+plot(-200:300,[squeeze(nanmean(sacdatNS2(~isnan(squeeze(sacdatNS2(:,chnsel,end))),chnsel,:),1))'; ...
+    squeeze(nanmean(sacdatNS6(~isnan(squeeze(sacdatNS6(:,chnsel,end))),chnsel,:),1))'])
+errorshade(squeeze(sacdatNS2(~isnan(squeeze(sacdatNS2(:,chnsel,end))),chnsel,:)),1,-200:300,'b')
+errorshade(squeeze(sacdatNS6(~isnan(squeeze(sacdatNS6(:,chnsel,end))),chnsel,:)),1,-200:300,'r')
+
+
+%% plot average/SEM saccade-aligned LFPs, all channels
 
 % add offset for plotting
 ofs = 30;
@@ -322,11 +333,11 @@ figure
 subplot(3,1,1)
 hold on
 
-trlsel = ~isnan(squeeze(sacdat(:,1,end))); % choose trials containing data to the end of the selection window
+trlsel = ~isnan(squeeze(sacdatNS2(:,1,end))); % choose trials containing data to the end of the selection window
 numtrlsel = length(find(trlsel));
 
 xaxis = -0.2:0.001:0.3;
-matrix = squeeze(sacdat(trlsel,1:12,:));
+matrix = squeeze(sacdatNS2(trlsel,1:12,:));
 matavg = squeeze(mean(matrix,1));
 matste = squeeze(std(matrix,0,1))/sqrt(size(matrix,1));
 
@@ -350,10 +361,10 @@ title([BRnam '; Array A; ' num2str(numtrlsel) ' fixpers'])
 subplot(3,1,2)
 hold on
 
-trlsel = ~isnan(squeeze(sacdat(:,1,end))); % choose trials containing data to the end of the selection window
+trlsel = ~isnan(squeeze(sacdatNS2(:,1,end))); % choose trials containing data to the end of the selection window
 
 xaxis = -0.2:0.001:0.3;
-matrix = squeeze(sacdat(trlsel,13:24,:));
+matrix = squeeze(sacdatNS2(trlsel,13:24,:));
 matavg = squeeze(mean(matrix,1));
 matste = squeeze(std(matrix,0,1))/sqrt(size(matrix,1));
 
@@ -377,10 +388,10 @@ title([BRnam '; Array B'])
 subplot(3,1,3)
 hold on
 
-trlsel = ~isnan(squeeze(sacdat(:,1,end))); % choose trials containing data to the end of the selection window
+trlsel = ~isnan(squeeze(sacdatNS2(:,1,end))); % choose trials containing data to the end of the selection window
 
 xaxis = -0.2:0.001:0.3;
-matrix = squeeze(sacdat(trlsel,25:36,:));
+matrix = squeeze(sacdatNS2(trlsel,25:36,:));
 matavg = squeeze(mean(matrix,1));
 matste = squeeze(std(matrix,0,1))/sqrt(size(matrix,1));
 
