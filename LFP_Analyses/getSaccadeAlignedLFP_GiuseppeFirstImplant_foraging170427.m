@@ -1,7 +1,8 @@
 % fildir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data\';
 fildir = 'C:\Data\Blackrock_VR';
-% BRnam = 'JN140815002';
-BRnam = 'JN140813002';
+
+% BRnam = 'JN140813002';
+BRnam = 'JN140815002';
 
 %% load the data and create double-precision versions of eye data
 
@@ -25,7 +26,7 @@ e_x = double(NS2.Data(xchan,:));
 e_y = double(NS2.Data(ychan,:));
 
 
-%% investigate different filtering parameters
+%% investigate different filtering parameters (can skip)
 
 % compare two sets of filtering parameters
 fltord1 = 40;
@@ -192,37 +193,37 @@ x_bound = e_x<xthresh(1) | e_x>xthresh(2);
 y_bound = e_y<ythresh(1) | e_y>ythresh(2);
 eyebound = x_bound | y_bound;
 
-figure
-ax(1) = subplot(3,1,1);
-plot(e_x,'b')
-ax(2) = subplot(3,1,2);
-plot(e_y,'r')
-ax(3) = subplot(3,1,3);
-plot(eyebound,'g')
-ylim([-0.25 1.25])
-linkaxes(ax,'x')
+% figure
+% ax(1) = subplot(3,1,1);
+% plot(e_x,'b')
+% ax(2) = subplot(3,1,2);
+% plot(e_y,'r')
+% ax(3) = subplot(3,1,3);
+% plot(eyebound,'g')
+% ylim([-0.25 1.25])
+% linkaxes(ax,'x')
 
-figure
-ax(1) = subplot(3,1,1);hold on
-plot(1:100000,e_x(1:100000),'.b')
-for k=1:find(sacarr(:,2)>100000,1,'first')
-    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
-    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
-end
-ax(2) = subplot(3,1,2);hold on
-plot(1:100000,e_y(1:100000),'.r')
-for k=1:find(sacarr(:,2)>100000,1,'first')
-    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
-    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
-end
-ax(3) = subplot(3,1,3);hold on
-plot(1:100000,eyebound(1:100000),'k')
-ylim([-0.25 1.25])
-for k=1:find(sacarr(:,2)>100000,1,'first')
-    line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
-    line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
-end
-linkaxes(ax,'x')
+% figure
+% ax(1) = subplot(3,1,1);hold on
+% plot(1:100000,e_x(1:100000),'.b')
+% for k=1:find(sacarr(:,2)>100000,1,'first')
+%     line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+%     line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+% end
+% ax(2) = subplot(3,1,2);hold on
+% plot(1:100000,e_y(1:100000),'.r')
+% for k=1:find(sacarr(:,2)>100000,1,'first')
+%     line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+%     line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+% end
+% ax(3) = subplot(3,1,3);hold on
+% plot(1:100000,eyebound(1:100000),'k')
+% ylim([-0.25 1.25])
+% for k=1:find(sacarr(:,2)>100000,1,'first')
+%     line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+%     line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+% end
+% linkaxes(ax,'x')
 
 %% choose saccades that don't precede fixations at edges(borders)
 
@@ -241,6 +242,31 @@ end
 
 sacsel = find(sacsel);
 
+%% choose saccades that don't precede fixations OR FOLLOW at edges(borders)
+% commented this out in preference for the previous cell, since the ERP
+% obtained when running this cell is greatly dampened compared to that
+% obtained when only excluding saccade that follow gaze at borders
+
+% sacsel = zeros(size(sacarr,1),1);
+% for saclop = 1:size(sacarr,1)
+%     if saclop~=size(sacarr,1)
+%         if saclop==1
+%             eyeboundPre = eyebound(1:sacarr(saclop,1)-1);
+%         else
+%             eyeboundPre = eyebound(sacarr(saclop-1,2)+1:sacarr(saclop,1)-1);
+%         end
+%         eyeboundPost = eyebound(sacarr(saclop,2)+1:sacarr(saclop+1,1)-1);
+%     else
+%         eyeboundPre = eyebound(sacarr(saclop-1,2)+1:sacarr(saclop,1)-1);
+%         eyeboundPost = eyebound(sacarr(saclop,2)+1:end);
+%     end
+%     if isempty(find(eyeboundPre,1)) && isempty(find(eyeboundPost,1))
+%         sacsel(saclop) = 1;
+%     end
+% end
+% 
+% sacsel = find(sacsel);
+
 %%
 
 decdir = 'C:\Data\MAT\NS6 - decimated\';
@@ -253,8 +279,9 @@ load(fullfile(decdir,[BRnam '_NS6_SF30.mat']))
 
 %% get NS2 and NS6 saccade-aligned data
 % note that this is hard-coded to take 36 channels of neural data
+% apparently after JN140813002, stopped saving neural data to NS2 file
 
-sacdatNS2 = nan(length(sacsel),36,501);
+% sacdatNS2 = nan(length(sacsel),36,501);
 sacdatNS6 = nan(length(sacsel),36,501);
 
 ft_defaults
@@ -273,16 +300,16 @@ for saclop = 1:length(sacsel)
             if length(ind1:ind2) <= 501
                 % take whole period if start of pre-saccade interval to end of
                 % fixation period is less than 501 ms
-                datbufNS2 = [double(NS2.Data(1:36,ind1:ind2)) nan(36,501-length(ind1:ind2))];
+%                 datbufNS2 = [double(NS2.Data(1:36,ind1:ind2)) nan(36,501-length(ind1:ind2))];
                 datbufNS6 = [double(NS6.Data(1:36,(ind1:ind2)+102)) nan(36,501-length(ind1:ind2))];
             else
                 % otherwise, truncate period at 300 ms after saccade onset
-                datbufNS2 = double(NS2.Data(1:36,ind1:ind1+500));
+%                 datbufNS2 = double(NS2.Data(1:36,ind1:ind1+500));
                 datbufNS6 = double(NS6.Data(1:36,(ind1:ind1+500)+102));
             end
         end
     
-        sacdatNS2(saclop,:,:) = datbufNS2;
+%         sacdatNS2(saclop,:,:) = datbufNS2;
         sacdatNS6(saclop,:,:) = datbufNS6;
         
     end
@@ -291,22 +318,22 @@ end
 ft_progress('close')
 
 % remove unused trial holders
-sacdatNS2 = sacdatNS2(~isnan(squeeze(sacdatNS2(:,1,1))),:,:);
+% sacdatNS2 = sacdatNS2(~isnan(squeeze(sacdatNS2(:,1,1))),:,:);
 sacdatNS6 = sacdatNS6(~isnan(squeeze(sacdatNS6(:,1,1))),:,:);
 
-trlcnt = nan(1,size(sacdatNS2,3));
-for timlop=1:size(squeeze(sacdatNS2(1,:,:)),2)
-    trlcnt(timlop) = length(find(~isnan(squeeze(sacdatNS2(:,1,timlop)))));
-end
+% trlcnt = nan(1,size(sacdatNS2,3));
+% for timlop=1:size(squeeze(sacdatNS2(1,:,:)),2)
+%     trlcnt(timlop) = length(find(~isnan(squeeze(sacdatNS2(:,1,timlop)))));
+% end
 
-% save(fullfile('C:\Data\MAT\sacdat\',[BRnam '_sacdat.mat']),'sacdat','NS2_timestamp','NS6_timestamp','artifact','NS2sacarr','trlcnt')
+% save(fullfile('C:\Data\MAT\SaccadeAligned\',[BRnam '_sacdat.mat']),'sacdat','NS2_timestamp','NS6_timestamp','artifact','NS2sacarr','trlcnt')
 
 
 %% de-mean each LFP segment
 
-for k=1:size(sacdatNS2,1)
-    for l=1:size(sacdatNS2,2)
-        sacdatNS2(k,l,:) = sacdatNS2(k,l,:)-nanmean(sacdatNS2(k,l,:));
+for k=1:size(sacdatNS6,1)
+    for l=1:size(sacdatNS6,2)
+%         sacdatNS2(k,l,:) = sacdatNS2(k,l,:)-nanmean(sacdatNS2(k,l,:));
         sacdatNS6(k,l,:) = sacdatNS6(k,l,:)-nanmean(sacdatNS6(k,l,:));
     end
 end
@@ -315,12 +342,23 @@ end
 
 chnsel = 13;
 
-figure; hold on
-plot(-200:300,[squeeze(nanmean(sacdatNS2(~isnan(squeeze(sacdatNS2(:,chnsel,end))),chnsel,:),1))'; ...
-    squeeze(nanmean(sacdatNS6(~isnan(squeeze(sacdatNS6(:,chnsel,end))),chnsel,:),1))'])
-errorshade(squeeze(sacdatNS2(~isnan(squeeze(sacdatNS2(:,chnsel,end))),chnsel,:)),1,-200:300,'b')
-errorshade(squeeze(sacdatNS6(~isnan(squeeze(sacdatNS6(:,chnsel,end))),chnsel,:)),1,-200:300,'r')
+% choose saccades where the post-saccade fixation fills the whole window
+% (i.e. isn't cut off by the next saccade)
+sacdatNS2_fullwin = squeeze(sacdatNS2(~isnan(sacdatNS2(:,chnsel,end)),chnsel,:));
+sacdatNS6_fullwin = squeeze(sacdatNS6(~isnan(sacdatNS6(:,chnsel,end)),chnsel,:));
 
+figure; hold on
+plot(-200:300,[nanmean(sacdatNS2_fullwin,1); nanmean(sacdatNS6_fullwin,1)])
+errorshade(sacdatNS2_fullwin,1,-200:300,'b')
+errorshade(sacdatNS6_fullwin,1,-200:300,'r')
+line([0 0],ylim,'Color','k','LineStyle','--')
+legend({'NS2','NS6'})
+
+%% save sacdat
+
+savdir = 'C:\Data\MAT\SaccadeAligned';
+% save(fullfile(savdir,[BRnam '_sacdatNS2_NS6.mat']), 'sacdatNS2', 'sacdatNS6')
+save(fullfile(savdir,[BRnam '_sacdatNS6.mat']), 'sacdatNS6')
 
 %% plot average/SEM saccade-aligned LFPs, all channels
 
@@ -414,3 +452,50 @@ title([BRnam '; Array C'])
 set(gcf,'Position',[777 39 560 937])
 
 figdir = 'R:\Mike\VirtualNavigationProject\Figures\Flexshaft_firstGizImplant2014\SaccadeAligned_SigToNoise';
+
+%% calculate signal to noise (for Chris Lewis paper)
+
+datdir = 'C:\Data\MAT\SaccadeAligned';
+chnsel = 13; % B1
+
+f1 = load(fullfile(datdir,'JN140813002_sacdatNS2_NS6.mat'));
+f2 = load(fullfile(datdir,'JN140815002_sacdatNS6.mat'));
+
+% choose only data segments where the post-saccade fixation fills the whole window
+% (i.e. isn't cut off by the next saccade)
+fullwinF1 = squeeze(f1.sacdatNS6(~isnan(f1.sacdatNS6(:,chnsel,end)),chnsel,:));
+fullwinF2 = squeeze(f2.sacdatNS6(~isnan(f2.sacdatNS6(:,chnsel,end)),chnsel,:));
+
+% plot average of sacnum data segments, selected randomly; repeat
+sacnum = 200;
+figure; hold on
+for k=1:20
+    plot(-200:300,nanmean(fullwinF1(randi(size(fullwinF1,1),1,sacnum),:),1));
+%     plot(-200:300,nanmean(fullwinF2(randi(size(fullwinF2,1),1,sacnum),:),1));
+end
+
+% signal window: 56-155
+% noise window: -155:-56
+sigwin = 56:155;
+noisewin = -155:-56;
+sacnum = 200;
+SNR = nan(100,1);
+for k=1:100 % 100 iterations
+    
+    trlsel = randi(size(fullwinF1,1),1,sacnum); % randomly select sacnum trials
+    
+    % average ABS within sigwin, for each trial
+    sigavg = mean(abs(fullwinF1(trlsel,ismember(-200:300,sigwin))),2);
+    % root meat square of ABS across trials
+    Ps = sqrt(mean(sigavg.^2));
+    
+    % average ABS within noisewin, for each trial
+    noiseavg = mean(abs(fullwinF1(trlsel,ismember(-200:300,noisewin))),2);
+    % root meat square of ABS across trials
+    Pn = sqrt(mean(noiseavg.^2));
+    
+    SNR(k) = 10*log10(Ps/Pn);
+
+end
+
+
