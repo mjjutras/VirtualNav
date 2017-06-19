@@ -3,7 +3,7 @@
 % containing the python behavioral data log
 
 BRnam = 'JN140812001';
-sesDir = 'R:\Buffalo Lab\VR Task Data UW\Giuseppe\panda data\2014\JN_14_08_12_12_26';
+sesDir = 'R:\VR Task Data UW\Giuseppe\panda data\2014\JN_14_08_12_12_26';
 
 %%
 % decimate the recording (downsample from 30 kS/s to 1 kS/s
@@ -22,7 +22,7 @@ else
 end
 
 sesNam = sesDir(find(sesDir=='\',1,'last')+1:end);
-trldatFil = fullfile('R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat',[sesNam '_trldat.mat']);
+trldatFil = fullfile('R:\Mike\VirtualNavigationProject\MATFiles\trldat',[sesNam '_trldat.mat']);
 if exist(trldatFil,'file')
     load(trldatFil)
 else

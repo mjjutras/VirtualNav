@@ -266,13 +266,19 @@ end
 
 % save(fullfile('C:\Data\MAT\sacdat\',[BRnam '_sacdat.mat']),'sacdat','NS2_timestamp','NS6_timestamp','artifact','NS2sacarr','trlcnt')
 
-
 %% de-mean each LFP segment
 for k=1:size(sacdat,1)
     for l=1:size(sacdat,2)
         sacdat(k,l,:) = sacdat(k,l,:)-nanmean(sacdat(k,l,:));
     end
 end
+
+%% load pre-saved variables
+
+BRnam = 'JN140815002';
+
+sacdat = load(fullfile('C:\Data\MAT\SaccadeAligned\', [BRnam '_sacdatNS6.mat']));
+sacdat = sacdat.sacdatNS6;
 
 %% plot some saccade-aligned LFPs
 
@@ -365,4 +371,4 @@ end
 title([BRnam '; Array C'])
 set(gcf,'Position',[777 39 560 937])
 
-figdir = 'R:\Mike\VirtualNavigationProject\Figures\Flexshaft_firstGizImplant2014\SaccadeAligned_SigToNoise';
+% figdir = 'R:\Mike\VirtualNavigationProject\Figures\Flexshaft_firstGizImplant2014\SaccadeAligned_SigToNoise';

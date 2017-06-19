@@ -38,8 +38,8 @@ function data = BRtoFT(sesDir,decDir,BRnam)
 % Also changed trlDir, network directory housing trldat files
 
 
-BRDir = 'R:\Buffalo Lab\Virtual Navigation\Recording Data\Blackrock Data';
-trlDir = 'R:\Buffalo Lab\Mike\VirtualNavigationProject\MATFiles\trldat';
+BRDir = 'R:\Virtual Navigation\Recording Data\Blackrock Data';
+trlDir = 'R:\Mike\VirtualNavigationProject\MATFiles\trldat';
 
 % load the behavioral data file; trldat contains info from python log
 [~,sesnam]=fileparts(sesDir);
