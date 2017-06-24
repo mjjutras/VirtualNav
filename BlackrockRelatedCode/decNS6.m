@@ -3,7 +3,7 @@ function NS6 = decNS6(BRnam,decdir,SF)
 % 161026 - revised to require entering decdir, the directory to save the
 % resulting downsampled NS6 structure
 
-% load from network by defauly
+% load from network by default
 ns6dir = 'R:\Virtual Navigation\Recording Data\Blackrock Data\';
 % load from local drive if available (faster but data must be copied from network first
 [~,hostname]= system('hostname');
