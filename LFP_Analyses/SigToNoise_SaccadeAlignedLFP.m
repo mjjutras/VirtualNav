@@ -10,10 +10,10 @@
 fildir = 'C:\Data\Blackrock_VR';
 % BRnam = 'JN140813002'; % didn't run; saccades are weird
 % BRnam = 'JN140815002';
-BRnam = 'JN140911002';
+% BRnam = 'JN140911002';
 % BRnam = 'JN141013002';
-% BRnam = 'JN141212003'; % don't use this one, from a calibration session?
-% BRnam = 'JN141212004';
+BRnam = 'JN141212004';
+% BRnam = 'JN150122006';
 
 %% get eye data from NS2 and treat to address sampling rate issues
 % (Blackrock samples at 1000 Hz vs. eyetracker 240 Hz sampling rate,
@@ -278,7 +278,7 @@ sacsel1 = find(sacsel1);
 %% further select saccades that are not followed or preceded by another saccade
 % within a 150(/lagwin) ms window
 
-lagwin = 20;
+lagwin = 150;
 
 sacsel2 = zeros(size(sacarr,1),1);
 for saclop = 1:size(sacarr,1)
@@ -299,6 +299,32 @@ sacsel2 = find(sacsel2);
 
 % combine sacsel1 & sacsel2
 sacsel = intersect(sacsel1,sacsel2);
+
+%% plot some sample eyetracking data with "sacsel" saccades marked
+
+figure
+ax(1) = subplot(2,1,1);hold on
+plot(1:100000,e_x(1:100000),'.b')
+for k=1:find(sacarr(:,2)>100000,1,'first')
+    if ismember(k,sacsel)
+        line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+        line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+        line([sacarr(k,1)-150 sacarr(k,1)-150],ylim,'Color','k','LineStyle','--')
+        line([sacarr(k,1)+150 sacarr(k,1)+150],ylim,'Color','k','LineStyle','--')
+    end
+end
+ax(2) = subplot(2,1,2);hold on
+plot(1:100000,e_y(1:100000),'.r')
+for k=1:find(sacarr(:,2)>100000,1,'first')
+    if ismember(k,sacsel)
+        line([sacarr(k,1) sacarr(k,1)],ylim,'Color','g')
+        line([sacarr(k,2) sacarr(k,2)],ylim,'Color','r')
+        line([sacarr(k,1)-150 sacarr(k,1)-150],ylim,'Color','k','LineStyle','--')
+        line([sacarr(k,1)+150 sacarr(k,1)+150],ylim,'Color','k','LineStyle','--')
+    end
+end
+linkaxes(ax,'x')
+
 
 %% load decimated NS6 neural data and sync with NS2
 % (grrr Blackrock)
@@ -366,6 +392,7 @@ end
 % data (not cutoff at 300 ms after each saccade)
 
 % 0 to include all saccades; 1 to exclude saccades to outside of eyetracker range (border)
+% also does the selection process of excluding rapid saccades (lagwin cell above)
 noBorder = 1;
 
 % find saccade start/end in task time
@@ -418,8 +445,8 @@ elseif noBorder==1
                 
                 sacdat{saclop} = NS6.Data(:,ts1:ts2);
                 
-                % demean the data in this step
-                sacdat{saclop} = sacdat{saclop}-int16(repmat(mean(sacdat{saclop},2),1,size(sacdat{saclop},2)));
+%                 % demean the data in this step
+%                 sacdat{saclop} = sacdat{saclop}-int16(repmat(mean(sacdat{saclop},2),1,size(sacdat{saclop},2)));
                 
             end
         end
@@ -478,23 +505,27 @@ plot((1:size(datchnsel,2))-200,squeeze(nanmean(datchnsel(~isnan(datchnsel(:,600)
 % winS = [80 139]; winN = [-79 -20]; % 0.400
 % winS = [85 134]; winN = [-80 -31]; % 0.358
 % winS = [85 134]; winN = [-64 -15]; % 0.609
+% winS = [85 134]; winN = [-94 -45]; % 0.609
 
 % after excluding saccades to/from outside eyetracker window:
-% JN140815002 (n = 1027)
-% winS = [85 134]; winN = [-64 -15]; % 0.234
-% winS = [85 134]; winN = [-94 -45]; % -0.319
+if strmatch('JN140815002',BRnam) %(n = 1027)
+%     winS = [85 134]; winN = [-64 -15]; % 0.234
+%     winS = [85 134]; winN = [-94 -45]; % -0.319
+    winS = [90 139]; winN = [-74 -25];
+elseif strmatch('JN140911002',BRnam)
+%     winS = [60 109]; winN = [-64 -15]; % 0.327
+%     winS = [60 109]; winN = [-94 -45]; % 0.035
+%     winS = [70 119]; winN = [-84 -35]; % 0.035
+    winS = [70 119]; winN = [-79 -30];
+elseif strmatch('JN141013002',BRnam)
+    winS = [75 124]; winN = [-94 -45]; % 0.536
+elseif strmatch('JN141212004',BRnam)
+    % winS = [65 114]; winN = [-94 -45]; % 0.246
+    winS = [65 114]; winN = [-64 -15]; % 0.602
+elseif strmatch('JN150122006',BRnam)
+    winS = [65 114]; winN = [-64 -15]; % 0.602
+end
 
-% JN140911002
-% winS = [60 109]; winN = [-64 -15]; % 0.327
-% winS = [60 109]; winN = [-94 -45]; % 0.035
-winS = [70 119]; winN = [-84 -35]; % 0.035
-
-% JN141013002
-% winS = [75 124]; winN = [-94 -45]; % 0.536
-
-% JN141212004
-% winS = [65 114]; winN = [-94 -45]; % 0.246
-% winS = [65 114]; winN = [-64 -15]; % 0.602
 
 trltim = (1:max(trlsiz))-200;
 selS = find(trltim==winS(1)):find(trltim==winS(2));
@@ -516,13 +547,19 @@ fill([winN(1):winN(2) fliplr(winN(1):winN(2))],[ones(size(winN(1):winN(2)))*yh(1
 % make sure length(selS) and length(selN) are equal
 if length(selS) == length(selN)
     
+    % take the maximum absolute value within the window for each trial
     valS = max(abs(dattimsel(:,selS)),[],2);
     valN = max(abs(dattimsel(:,selN)),[],2);
-    
+
+%     % take the average absolute value within the window for each trial
+%     valS = mean(abs(dattimsel(:,selS)),2);
+%     valN = mean(abs(dattimsel(:,selN)),2);
+
     Ps = mean(valS.^2);
     Pn = mean(valN.^2);
     
-    10*log10(Ps/Pn)
+    snr = 10*log10(Ps/Pn)
+    title([BRnam '; n = ' num2str(size(dattimsel,1)) '; SNR = ' num2str(snr)])
     
 else
     
